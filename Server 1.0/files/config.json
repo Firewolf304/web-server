@@ -1,0 +1,49 @@
+{
+  "SERVER" : {
+    "CONFIG" : {
+      "MODE" : "basic",
+      "IP" : "127.0.0.1",
+      "PORT" : 82,
+      "PATH_PAGES": "/pages",
+      "MACHINE_INFO" : false,
+      "EPOLLS_COUNT" : 2000,
+      "ACCESS" : [
+        {"ADMIN" :  1000},
+        {"ALL" :  0}
+      ]
+    },
+    "SSL" : {
+      "ENABLE" : false
+    },
+    "SQL" : {
+
+    },
+    "CUDA_MACHINE" : {
+      "ENABLE" : false
+    }
+  },
+  "PROXY_SERVER" : {
+    "PROXY" : [
+      {
+        "PATH" :  "/apis/rand",
+        "PROTOCOL" : "https" ,
+        "ADRESS" :  "api.rand.by",
+        "PORT": "",
+        "PROXY_PATH" : "/v1/integer",
+        "HEADERS" :  { "Accept": "*/*","Host": "api.rand.by","Connection": "close" },
+        "CONFIG_HEADERS" : {
+          "CUSTOM_HEAD_REQUEST" : "GET /v1/integer HTTP/1.1\n",
+          "USE_CLIENT_HEADERS" : false,
+          "REMOVE_CLIENT_HEADERS" : ["sec-ch-ua-platform", "Connection"]
+        },
+        "RESPONSE_CONFIG" : {
+          "REMOVE_HEADERS": true,
+          "REMOVE_HEADERS_NAME" : [
+            "Server", "Date", "ETag", "Vary", "Content-Length"
+          ]
+
+        }
+      }
+    ]
+  }
+}

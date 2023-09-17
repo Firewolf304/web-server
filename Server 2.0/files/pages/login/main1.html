@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Пример запроса к API</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        $( document ).ready(function() {
+            $.ajax({
+                url: "/rand",
+                method: "POST",
+                data: { to: 100 },
+                dataType: "json"
+            }).done(function(data) {
+                $('#result').text(data);
+            }).fail(function(jqXHR, textStatus, errorThrown) {
+                console.error("Ошибка при выполнении запроса:", errorThrown);
+            });
+        });
+    </script>
+</head>
+<body>
+<div id="result">Здесь будет результат</div>
+</body>
+</html>

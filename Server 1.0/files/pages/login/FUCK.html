@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Вход</title>
+    <link rel="stylesheet" type="text/css" href="login/style.css">
+</head>
+<body>
+<div id="id"></div>
+
+<form action="/login" method="post">
+    <label for="username">Логин:</label>
+    <input type="text" id="username" name="username" placeholder="Логин" required>
+
+    <label for="password">Пароль:</label>
+    <input type="password" id="password" name="password" placeholder="Пароль" required>
+
+    <input type="submit" value="Войти">
+</form>
+
+<script>
+    // Отправляем AJAX-запрос на получение идентификатора
+    const xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+            document.getElementById("id").innerHTML = `Идентификатор: ${this.responseText}`;
+        }
+    };
+    xhttp.open("GET", "/rand?to=100", true);
+    xhttp.send();
+</script>
+</body>
+</html>
