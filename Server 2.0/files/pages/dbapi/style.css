@@ -1,0 +1,11 @@
+.json-list {
+    list-style-type: none;
+}
+
+.json-object {
+    cursor: pointer;
+}
+
+.hidden {
+    display: none;
+}

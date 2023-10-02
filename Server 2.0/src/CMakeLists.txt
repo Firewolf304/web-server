@@ -3,9 +3,16 @@ project(Server_2_0)
 
 set(CMAKE_CXX_STANDARD 23)
 
-add_executable(Server_2_0 main.cpp log_stream.cpp
+add_executable(Server_2_0
+        main.cpp
+        log_stream.cpp
         variables.h
-        usings.h)
+        usings.h
+        ssl.cpp
+        response.cpp
+        globals.h
+        include.h
+)
 
 find_package(ZLIB)
 target_link_libraries(Server_2_0 ZLIB::ZLIB)
@@ -24,3 +31,7 @@ include_directories(/usr/include/mono-2.0)
 target_link_libraries(Server_2_0 mono-2.0)
 
 target_link_libraries(Server_2_0 pqxx)
+
+find_package(OpenSSL REQUIRED)
+
+target_link_libraries(Server_2_0 curl)

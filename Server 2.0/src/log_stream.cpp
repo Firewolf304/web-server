@@ -94,7 +94,7 @@ namespace firewolf::streams {
     class logger {
     private:
         log_stream stream;
-        std::vector<std::string> string_value = { "LOG", "WARNING", "ERROR", "MESSAGE", "DEBUG" };
+        //std::vector<std::string> string_value = { "LOG", "WARNING", "ERROR", "MESSAGE", "DEBUG" };
         /*int to_int(types e)
         {
             return static_cast<int>(e);
@@ -109,7 +109,7 @@ namespace firewolf::streams {
 
         }*/
     public:
-        enum types : int {
+        /*enum types : int {
             NULLER = -2,
             NONE = -1,
             LOG = 0,
@@ -117,15 +117,19 @@ namespace firewolf::streams {
             ERROR = 2,
             MESSAGE = 3,
             DEBUG = 4
-        };
+        };*/
         /*======config======*/
-        std::unordered_map<types, bool> allowed_type = {
-                {types::LOG, true},
-                {types::WARNING, true},
-                {types::ERROR, true},
-                {types::MESSAGE, true},
-                {types::DEBUG, true}
+        std::unordered_map<std::string, bool> allowed_type = {
+                {"LOG", true},
+                {"WARNING", true},
+                {"ERROR", true},
+                {"MESSAGE", true},
+                {"DEBUG", true}
         };
+        int get_id_thread() {
+            std::stringstream id; id<< this->stream.thread.get_id();
+            return stoi( id.str() );
+        }
         /*======config======*/
         /*void ShowInfo () {
             auto tostringbool = [this] (bool value) -> std::string {
@@ -159,16 +163,32 @@ namespace firewolf::streams {
             this->stream.stop();
         }
 
-        logger set(types type) {
+        logger set(std::string type) {
             this->value_type = type;
             return *this;
         }
-        types value_type;
+        std::string value_type = "";
+        logger operator[] (const std::string value) {
+            this->value_type = value;
+            return *this;
+        }
+        void operator<< (const std::string & text ) {
+            this->stream << text;
+        }
+        /*friend void operator << (logger type, const std::string& text) {
+            if(type.value_type != "") {
+                if( type.allowed_type[type.value_type] ) {
+                    type.stream << "[" + type.value_type + "] " + text;
+                }
+            }
+            else {
+                type.stream << text;
+            }
+        }*/
         void operator<=(const std::string & text) {
-            std::string a = "123";
-            if(value_type != logger::NONE) {
+            if(value_type != "") {
                 if( this->allowed_type[value_type] ) {
-                    this->stream << "[" + this->string_value[value_type] + "] " + text;
+                    this->stream << "[" + value_type + "] " + text;
                 }
             }
             else {
@@ -176,18 +196,20 @@ namespace firewolf::streams {
             }
         }
 
-        void out(types type, std::string text) {
+        void out(std::string type, std::string text) {
             if( !this->allowed_type[type] ) {return;}
-            if(type != logger::NONE) {
-                this->stream << "[" + this->string_value[type] + "] " + text;
+            if(type != "") {
+                this->stream << "[" + type + "] " + text;
             }
             else {
                 this->stream << text;
             }
+
         }
-        void operator<< (const std::string & text ) {
+        void out(std::string text) {
             this->stream << text;
         }
+
         void close () {
             this->stream.stop();
         }

@@ -3,37 +3,14 @@
 //
 
 typedef int sock_handle;
+
 #ifndef SERVER_2_0_VARIABLES_H
 #define SERVER_2_0_VARIABLES_H
+#include "include.h"
 
-#include <iostream>
-#include "log_stream.cpp"
-#include "openssl/ssl.h"
-#include "ssl.cpp"
-#include <fcntl.h>
-#include <sstream>
-#include <vector>
-#include <filesystem>
-#include <zlib.h>
-#include <fstream>
-#include <future>
-#include "response.cpp"
-#include <sys/epoll.h>
-#include <unistd.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <iostream>
-#include <boost/asio.hpp>
-#include <boost/bind/bind.hpp>
-#include <boost/asio/ssl.hpp>
-#include <regex>
-#include "usings.h"
-#include <boost/filesystem.hpp>
-#include <boost/iostreams/filter/gzip.hpp>
-#include <boost/iostreams/filtering_streambuf.hpp>
-#include <boost/iostreams/copy.hpp>
-#include <sys/utsname.h>
+
+
+
 string path;
 /*----epoll----*/
 int nfds = 20000;
@@ -61,7 +38,7 @@ string PAGE_PATH = "/pages";
 int timeout_client = -1;
 firewolf::ssl_space::SSL space(false, &secure_handle);
 vector<json> proxy_path;
-struct main_funcs {
+/*struct main_funcs {
     int * timeoutclient = &timeout_client;
     api * app_ptr = &app;
     string * ip = &ipAddr;
@@ -70,7 +47,25 @@ struct main_funcs {
     std::shared_ptr<int> active_epols = std::make_shared<int>(nfds);
     string * pages = &PAGE_PATH;
     json config_Data;
+    bool machine_info = false;
+    vector<json> proxy_path;
+    //std::shared_ptr<firewolf::streams::logger> output = output;
+} main_data;*/
+
+struct main_funcs {
+    firewolf::streams::logger * log;
+    int * timeoutclient;
+    api * app_ptr;
+    string * ip;
+    std::shared_ptr<unsigned int> portptr;
+    ssl_space::SSL * ssl_info;
+    std::shared_ptr<int> active_epols;
+    string * pages;
+    json config_Data;
+    bool machine_info = false;
     vector<json> proxy_path;
     //std::shared_ptr<firewolf::streams::logger> output = output;
 };
+main_funcs main_data = {&logging, &timeout_client, &app, &ipAddr, port, &space, std::make_shared<int>(nfds), &PAGE_PATH, NULL, false, {} } ;
+
 #endif //SERVER_2_0_VARIABLES_H

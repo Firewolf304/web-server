@@ -10,7 +10,10 @@
       "ACCESS" : [
         {"ADMIN" :  1000},
         {"ALL" :  0}
-      ]
+      ],
+      "MODULES" : {
+        "ENABLE" : true
+      }
     },
     "SSL" : {
       "ENABLE" : false
@@ -30,7 +33,7 @@
         "ADRESS" :  "api.rand.by",
         "PORT": "",
         "PROXY_PATH" : "/v1/integer",
-        "HEADERS" :  { "Accept": "*/*","Host": "api.rand.by","Connection": "close" },
+        "HEADERS" :  { "Host": "api.rand.by", "Accept": "*/*","Host": "api.rand.by","Connection": "close" },
         "CONFIG_HEADERS" : {
           "CUSTOM_HEAD_REQUEST" : "GET /v1/integer HTTP/1.1\n",
           "USE_CLIENT_HEADERS" : false,
@@ -39,7 +42,7 @@
         "RESPONSE_CONFIG" : {
           "REMOVE_HEADERS": true,
           "REMOVE_HEADERS_NAME" : [
-            "Server", "Date", "ETag", "Vary", "Content-Length"
+            "server", "date", "etag", "vary", "content-length", "x-render-origin-server", "alt-svc", "x-powered-by", "cf-ray"
           ]
 
         }

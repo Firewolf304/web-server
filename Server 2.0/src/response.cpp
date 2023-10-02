@@ -1,6 +1,3 @@
-//
-// Created by root on 25.04.23.
-//
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,7 +7,7 @@
 #include <mono-2.0/mono/metadata/debug-helpers.h>
 #include <dlfcn.h>
 #include <filesystem>
-typedef int sock_handle;
+
 #include <sstream>
 #include <vector>
 #include <filesystem>
@@ -19,8 +16,13 @@ typedef int sock_handle;
 #include <functional>
 
 #include "nlohmann/json.hpp"
+
+typedef int sock_handle;
 using namespace::nlohmann;
+
+
 namespace firewolf::responser{
+
     typedef struct body{
         std::vector<std::vector<std::string>> headers;
     };
@@ -205,7 +207,7 @@ namespace firewolf::requester{
     class check_path{
     public:
         std::unordered_map<std::string, std::string> format = {
-                {".js", "text/html"},
+                {".js", "text/javascript"},
                 {".html", "text/html"},
                 {".jpg", "image/jpg"},
                 {".png", "image/png"},
@@ -259,13 +261,20 @@ namespace firewolf::requester{
 
 
 }
+
+#include <mono-2.0/mono/jit/jit.h>
+#include <mono-2.0/mono/metadata/assembly.h>
+#include <mono-2.0/mono/metadata/debug-helpers.h>
+#include <csignal>
+#include <ucontext.h>
+
 class api{
 private:
-    typedef const char* (*InfoFunc)();
-    typedef void (*startFunc)(std::string*, responser::response*, requester::request_data);
 
+    typedef const char* (*InfoFunc)();
+    typedef void (*startFunc)(std::string*, responser::response*, requester::request_data, void*  );
 public:
-    std::unordered_map<std::string, std::function<void(std::string*, responser::response*, requester::request_data, std::unordered_map<std::string, json>)>> routes;
+    std::unordered_map<std::string, std::function<void(std::string*, responser::response*, requester::request_data, std::unordered_map<std::string, json>, void* )>> routes;
     std::unordered_map<std::string, startFunc> map_funcs;
     std::unordered_map<std::string, void*> map_handles;
     std::string path_dirs = "/apis";
@@ -285,6 +294,7 @@ public:
     }
     api()
     {
+
         char buff[PATH_MAX];
         //app_path = local_path;
         ssize_t length = readlink("/proc/self/exe", buff, sizeof(buff));
@@ -295,12 +305,15 @@ public:
         for(auto file : std::filesystem::directory_iterator(app_path + path_dirs)) {
             if(file.is_directory()) {
                 json info = info.parse(this->read_file(file.path().string() + "/config.json"));
-                std::cout << "\tfind => " << file.path().filename() << std::endl;
-                access["/" + file.path().filename().string()] = info;
+                std::string path = info["path"].get<std::string>();
+                std::cout << "\tfind => " << file.path().filename() << " to => " << path << std::endl;
+
+                access[path] = info;
 
 
                 std::unordered_map<std::string, std::function<void()>> switch_lang = {
-                    {"cpp",  [this, file] () {
+                    {"cpp",  [this, file, path] () {
+
                             char * error;
                         std::cout << "\t\tpath - " << file.path().string() + "/main.so" << std::endl;
                             void *handle = dlopen((file.path().string() + "/main.so").c_str(),RTLD_LAZY);
@@ -320,20 +333,30 @@ public:
                                 std::cout << "\t\tcancel: cant load start (" << error << ")\n";
                                 return;
                             }
-                            map_handles["/" + file.path().filename().string()] = handle;
-                            map_funcs["/" + file.path().filename().string()] = start;
-                            routes["/" + file.path().filename().string()] =[this](std::string * s, responser::response* rep, requester::request_data req, std::unordered_map<std::string, json> access_info) {
-                                map_funcs[req.request_info.path](s, rep, req);
+                            map_handles[path] = handle;
+                            map_funcs[path] = start;
+                            routes[path] = [this](std::string * s, responser::response* rep, requester::request_data req, std::unordered_map<std::string, json> access_info, void* funcs ) {
+
+                                try {
+                                    auto handshake = [](int sig) -> void {
+                                        throw std::runtime_error( "something wrong with api" );
+                                    };
+                                    signal(SIGSEGV, handshake);
+                                     map_funcs[req.request_info.path](s, rep, req, funcs);
+                                } catch (std::exception& e) {
+                                    *s+="[api error]";
+                                    std::cout << e.what() << "\n\tIt is -> " + req.request_info.path << std::endl;
+                                }
                             };
                             //start(s, rep, req);
                             delete error;
                             free(error);
                         }
                     },
-                    {"csharp", [this, file]() {
-                            routes["/" + file.path().filename().string()] = [this](std::string *s, responser::response *rep,
+                    {"csharp", [this, file, path]() {
+                            routes[path] = [this](std::string *s, responser::response *rep,
                                                                                    requester::request_data req,
-                                                                                   std::unordered_map<std::string, json> access_info) {
+                                                                                   std::unordered_map<std::string, json> access_info, void* funcs ) {
 
                                 //map_funcs[req.request_info.path](s, rep, req);
 

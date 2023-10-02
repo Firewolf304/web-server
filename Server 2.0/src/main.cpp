@@ -1,7 +1,23 @@
+
+
+//
+//
+//
+//
+//  Created by
+//  ███████╗██╗██████╗ ███████╗██╗    ██╗ ██████╗ ██╗     ███████╗██████╗  ██████╗ ██╗  ██╗
+//  ██╔════╝██║██╔══██╗██╔════╝██║    ██║██╔═══██╗██║     ██╔════╝╚════██╗██╔═████╗██║  ██║
+//  █████╗  ██║██████╔╝█████╗  ██║ █╗ ██║██║   ██║██║     █████╗   █████╔╝██║██╔██║███████║
+//  ██╔══╝  ██║██╔══██╗██╔══╝  ██║███╗██║██║   ██║██║     ██╔══╝   ╚═══██╗████╔╝██║╚════██║
+//  ██║     ██║██║  ██║███████╗╚███╔███╔╝╚██████╔╝███████╗██║     ██████╔╝╚██████╔╝     ██║
+//  ╚═╝     ╚═╝╚═╝  ╚═╝╚══════╝ ╚══╝╚══╝  ╚═════╝ ╚══════╝╚═╝     ╚═════╝  ╚═════╝      ╚═╝
+//
+//
+//
+//
+//
+
 #include "variables.h"
-
-main_funcs main_data;
-
 
 void read_cfg() {
     std::ifstream file("config.json", std::ios::binary);
@@ -20,93 +36,156 @@ void read_cfg() {
     *(main_data.portptr) = config["SERVER"]["CONFIG"]["PORT"].get<uint>();
     *(main_data.pages) = config["SERVER"]["CONFIG"]["PATH_PAGES"].get<string>();
     enable_ssl = config["SERVER"]["SSL"]["ENABLE"].get<bool>();
+    main_data.machine_info = config["SERVER"]["CONFIG"]["MACHINE_INFO"].get<bool>();
     main_data.proxy_path = config["PROXY_SERVER"]["PROXY"];
     cout<< "Proxy pathes:" << endl;
     for(json data : main_data.proxy_path) {
         cout << "\t" + data["PATH"].get<string>() + (string)" to " + data["ADRESS"].get<string>() << endl;
         main_data.app_ptr->access[data["PATH"]] = data;
-        main_data.app_ptr->routes[data["PATH"]] = [](string * s, responser::response* rep, requester::request_data req, unordered_map<string, json> access_info) {
+        main_data.app_ptr->routes[data["PATH"]] = [](std::string * s, responser::response* rep, requester::request_data req, std::unordered_map<std::string, json> access_info, void*funcs) {
             //std::async(launch::async, logger::log_chat_async, "SERVER", logger::type_log::DEBUG, "RUNNING PROXY PATH");
-            boost::asio::io_context ioContext;
-            boost::asio::ssl::context ssl_context(boost::asio::ssl::context::sslv23);
-            ssl_context.set_default_verify_paths();
-            boost::asio::ssl::stream<boost::asio::ip::tcp::socket> socket(ioContext, ssl_context);
-            boost::asio::ip::tcp::resolver resolver(ioContext);
-            std::regex pattern (R"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})");
-            boost::asio::ip::tcp::resolver::query query("NULL", "NULL");
-            if(regex_match(access_info[req.request_info.path]["ADRESS"].get<string>(), pattern)) {
-                query = boost::asio::ip::tcp::resolver::query(access_info[req.request_info.path]["ADRESS"].get<string>(), access_info[req.request_info.path]["PORT"].get<string>());
-            }
-            else {
-                query = boost::asio::ip::tcp::resolver::query( access_info[req.request_info.path]["ADRESS"].get<string>(), access_info[req.request_info.path]["PROTOCOL"].get<string>() );
-            }
-            boost::asio::ip::tcp::resolver::iterator endpoint_iterator = resolver.resolve(query);
-            socket.next_layer().open(boost::asio::ip::tcp::v4());
-            socket.next_layer().non_blocking(true);
-            //boost::asio::deadline_timer timer(ioContext);
-            //timer.expires_from_now(boost::posix_time::seconds(6)); // 5 секундное ожидание
-            /*timer.async_wait([&socket, endpoint_iterator, &access_info, &req, &s](const boost::system::error_code& error){
-                if (!error){
+            try {
+                CURL* curl = curl_easy_init();
+                string headers;
+                if (curl) {
+                    std::regex pattern(R"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})");
+                    curl_easy_setopt(curl, CURLOPT_URL, (access_info[req.request_info.path]["PROTOCOL"].get<string>() + "://" +
+                           access_info[req.request_info.path]["ADRESS"].get<string>() +
+                           ( (regex_match(access_info[req.request_info.path]["ADRESS"].get<string>(), pattern)) ?
+                                ":" + access_info[req.request_info.path]["PORT"].get<string>() : "" ) +
+                           access_info[req.request_info.path]["PROXY_PATH"].get<string>() ).c_str() );      // header set option
+                    curl_slist* header_list = nullptr;
+                    bool client = access_info[req.request_info.path]["CONFIG_HEADERS"]["USE_CLIENT_HEADERS"].get<bool>();
+                    for (auto it = access_info[req.request_info.path]["HEADERS"].begin(); it != access_info[req.request_info.path]["HEADERS"].end(); ++it) { // config
+                        header_list = curl_slist_append(header_list, (it.key() + ": " + it.value().get<string>() ).c_str() );
+                        if (client && (req.headers.contains(it.key()))) {
+                            req.headers.erase(it.key());
+                        }
+                    }
+                    if (client) {
+                        for (auto it = req.headers.begin(); it != req.headers.end(); ++it) { // client
+                            auto rem = access_info[req.request_info.path]["CONFIG_HEADERS"]["REMOVE_CLIENT_HEADERS"];
+                            if (std::find(rem.begin(), rem.end(), it.key()) != rem.end()) continue;
+                            header_list = curl_slist_append(header_list, (it.key() + ": " + it.value().get<string>() ).c_str() );
+                        }
+                    }
+                    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, header_list);
+                    // ----------------- get data options -----------------
+                    auto get_data = [](char *contents, size_t size, size_t nmemb, void *userp) {
+                        *((std::string*)userp) += (string)((char*)contents);
+                        return size * nmemb;
+                    };
+                    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, static_cast<size_t(*)(char*,size_t, size_t, void*)>(get_data));
+                    curl_easy_setopt(curl, CURLOPT_WRITEDATA, s);
+                    curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, static_cast<size_t(*)(char*,size_t, size_t, void*)>(get_data));
+                    curl_easy_setopt(curl, CURLOPT_HEADERDATA, &headers);
+                    // ----------------- get data options -----------------
+                    CURLcode res = curl_easy_perform(curl); // run request
+                    if (res != CURLE_OK) {
+                        char error[256];
+                        ERR_error_string(res, static_cast<char *>(error));
+                        throw std::runtime_error("CURL NOT OK: " + (string)error );
+                        delete[] &error;
+                    }
+                    headers = firewolf::requester::pop_line(headers, "HTTP/2 200", "\r\n");
+                    if (access_info[req.request_info.path]["RESPONSE_CONFIG"]["REMOVE_HEADERS"].get<bool>()) {
+                        auto array = access_info[req.request_info.path]["RESPONSE_CONFIG"]["REMOVE_HEADERS_NAME"];
+                        for (auto d = array.begin(); d != array.end(); ++d) {// format to array?
+                            headers = firewolf::requester::pop_line(headers, d.value().get<string>() + ": ", "\r\n");
+                        }
+                    }
+                    rep->header_body += headers.substr(0, headers.find("\r\n\r\n") + 2);
+                    curl_slist_free_all(header_list);
+                    curl_easy_cleanup(curl);
+                }
+                /*boost::asio::io_context ioContext;
+                boost::asio::ssl::context ssl_context(boost::asio::ssl::context::tlsv12_client);
+                ssl_context.load_verify_file("/etc/ssl/certs/ca-bundle.crt");
+                boost::asio::ssl::stream<boost::asio::ip::tcp::socket> socket(ioContext, ssl_context);
+                boost::asio::ip::tcp::resolver resolver(ioContext);
+                std::regex pattern(R"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})");
+                boost::asio::ip::tcp::resolver::query query("NULL", "NULL");
+                if (regex_match(access_info[req.request_info.path]["ADRESS"].get<string>(), pattern)) {
+                    query = boost::asio::ip::tcp::resolver::query(
+                            access_info[req.request_info.path]["ADRESS"].get<string>(),
+                            access_info[req.request_info.path]["PORT"].get<string>());
+                } else {
+                    query = boost::asio::ip::tcp::resolver::query(
+                            access_info[req.request_info.path]["ADRESS"].get<string>(),
+                            access_info[req.request_info.path]["PROTOCOL"].get<string>());
+                }
+                boost::asio::ip::tcp::resolver::iterator endpoint_iterator = resolver.resolve(query);
+                socket.next_layer().open(boost::asio::ip::tcp::v4());
+                socket.next_layer().non_blocking(true);
+
+                boost::asio::streambuf();
+                boost::asio::connect(socket.next_layer(), endpoint_iterator);
+
+                socket.set_verify_mode(boost::asio::ssl::verify_peer);
+                socket.set_verify_callback(boost::asio::ssl::host_name_verification(access_info[req.request_info.path]["ADRESS"].get<string>()));
+                socket.handshake(boost::asio::ssl::stream_base::client);
+                if (access_info[req.request_info.path]["PROTOCOL"] == "https") {
 
                 }
-            }) ;
-
-            ioContext.run();*/
-            boost::asio::streambuf();
-            boost::asio::connect(socket.next_layer(), endpoint_iterator);
-            socket.handshake(boost::asio::ssl::stream_base::client);
-            boost::asio::streambuf request;
-            std::ostream requestStream{&request};
-            requestStream << req.request_info.method << " " <<
-                          access_info[req.request_info.path]["PROXY_PATH"].get<string>() << (req.request_info.media_path.empty() ? "" : "?" + req.request_info.media_path) << " HTTP/1.1\r\n";
-            requestStream << "Host: " << access_info[req.request_info.path]["ADRESS"].get<string>() << "\r\n";
-            bool client = access_info[req.request_info.path]["CONFIG_HEADERS"]["USE_CLIENT_HEADERS"].get<bool>();
-            for(auto it = access_info[req.request_info.path]["HEADERS"].begin(); it != access_info[req.request_info.path]["HEADERS"].end(); ++it) { // config
-                requestStream << it.key() << ": " << it.value() << "\r\n";
-                if(client && (req.headers.contains(it.key())) ) {
-                    req.headers.erase(it.key());
-                }
-            }
-            if(client) {
-                for (auto it = req.headers.begin(); it != req.headers.end(); ++it) { // client
-                    auto rem = access_info[req.request_info.path]["CONFIG_HEADERS"]["REMOVE_CLIENT_HEADERS"];
-                    if( std::find(rem.begin(), rem.end(), it.key()) != rem.end() ) continue;
-
+                boost::asio::streambuf request;
+                std::ostream requestStream{&request};
+                requestStream << req.request_info.method << " " <<
+                              access_info[req.request_info.path]["PROXY_PATH"].get<string>()
+                              << (req.request_info.media_path.empty() ? "" : "?" + req.request_info.media_path)
+                              << " HTTP/1.1\r\n";
+                requestStream << "Host: " << access_info[req.request_info.path]["ADRESS"].get<string>() << "\r\n";
+                bool client = access_info[req.request_info.path]["CONFIG_HEADERS"]["USE_CLIENT_HEADERS"].get<bool>();
+                for (auto it = access_info[req.request_info.path]["HEADERS"].begin();
+                     it != access_info[req.request_info.path]["HEADERS"].end(); ++it) { // config
                     requestStream << it.key() << ": " << it.value() << "\r\n";
+                    if (client && (req.headers.contains(it.key()))) {
+                        req.headers.erase(it.key());
+                    }
                 }
-            }
-            requestStream << "\r\n";
-            if(!req.body.empty()) {
-                requestStream << req.body;
-            }
-            write(socket, request);
-            ioContext.run();
-            boost::asio::streambuf response;
-            boost::system::error_code errorCode;
-            boost::asio::read(socket, response, errorCode);
-            stringstream out;
-            out << (&response);
-            string output = out.str();
-            //cout << firewolf::requester::get_line_ready(output, "\r\n\r\n") << endl;
-            std::size_t pos = output.find('\n');
-            if (pos != std::string::npos) {
-                output.erase(0, pos+1);
-            }
-            if(access_info[req.request_info.path]["RESPONSE_CONFIG"]["REMOVE_HEADERS"].get<bool>()) {
-                auto array = access_info[req.request_info.path]["RESPONSE_CONFIG"]["REMOVE_HEADERS_NAME"];
-                for (auto d = array.begin(); d != array.end(); ++d) {// format to array?
-                    output = firewolf::requester::pop_line(output, d.value().get<string>() + ": ", "\r\n");
-                }
-            }
-            rep->header_body += output.substr(0, output.find("\r\n\r\n")+2 );
-            *s += firewolf::requester::get_line_ready(output, "\r\n\r\n");
-            /*if(!errorCode) {
+                if (client) {
+                    for (auto it = req.headers.begin(); it != req.headers.end(); ++it) { // client
+                        auto rem = access_info[req.request_info.path]["CONFIG_HEADERS"]["REMOVE_CLIENT_HEADERS"];
+                        if (std::find(rem.begin(), rem.end(), it.key()) != rem.end()) continue;
 
+                        requestStream << it.key() << ": " << it.value() << "\r\n";
+                    }
+                }
+                requestStream << "\r\n";
+                if (!req.body.empty()) {
+                    requestStream << req.body;
+                }
+                write(socket, request);
+                ioContext.run();
+                boost::asio::streambuf response;
+                boost::system::error_code errorCode;
+                boost::asio::read(socket, response, errorCode);
+                stringstream out;
+                out << (&response);
+                string output = out.str();
+                cout << "TEST: " << output << endl;
+                //cout << firewolf::requester::get_line_ready(output, "\r\n\r\n") << endl;
+                std::size_t pos = output.find('\n');
+                if (pos != std::string::npos) {
+                    output.erase(0, pos + 1);
+                }
+                if (access_info[req.request_info.path]["RESPONSE_CONFIG"]["REMOVE_HEADERS"].get<bool>()) {
+                    auto array = access_info[req.request_info.path]["RESPONSE_CONFIG"]["REMOVE_HEADERS_NAME"];
+                    for (auto d = array.begin(); d != array.end(); ++d) {// format to array?
+                        output = firewolf::requester::pop_line(output, d.value().get<string>() + ": ", "\r\n");
+                    }
+                }
+                rep->header_body += output.substr(0, output.find("\r\n\r\n") + 2);
+
+                *s += firewolf::requester::get_line_ready(output, "\r\n\r\n");*/
             }
-            else {
-                rep->header_body += "Connection: close\r\nContent-Type: text/html\r\n";
-                *s += "[Error api]";
-            }*/
+            catch (boost::system::system_error& exp) {
+                logging.out("ERROR", "ALERT! Api error: " + req.request_info.method + " " + req.request_info.path + " " + req.request_info.media_path + "\nwhat: " + exp.what() );
+                *s+="[api error]";
+            }
+            catch (std::exception& e) {
+                logging.out("ERROR", "Api error: " + req.request_info.method + " " + req.request_info.path + " " + req.request_info.media_path + "\nwhat: " + e.what() );
+                *s+="[api error]";
+            }
         };
     }
 
@@ -222,9 +301,9 @@ void check( sockaddr_in client, int client_handle, ssl_st * ssl, bool secure)
     //out.detach();
     char buffer[2048];
     try {
-        (secure) ? SSL_read(ssl, buffer, sizeof(buffer) - 1) : recv(client_handle, &buffer, sizeof(buffer), 0);
+        (secure) ? SSL_read(ssl, buffer, sizeof(buffer) - 1) : recv(client_handle, &buffer, sizeof(buffer), MSG_PEEK);
         //async(launch::async, logger::log_chat_async, "CLIENT", logger::type_log::DEBUG, (string) "Connected client, status - " + ((secure) ? (string) "true" : (string) "false"), &client);
-        logging.out(log_type::DEBUG, "Connected client, status - " + ((secure) ? (string) "true" : (string) "false"));
+        logging.out("LOG", "Connected client: " + (string)inet_ntoa(client.sin_addr) + ":" + to_string(ntohs(client.sin_port)) + ", status - " + ((secure) ? (string) "true" : (string) "false"));
 
     } catch(std::exception ) {
         stop(); return;
@@ -232,7 +311,7 @@ void check( sockaddr_in client, int client_handle, ssl_st * ssl, bool secure)
     try{
         if (((string)buffer).length()<= 0) {
             //async(launch::async, logger::log_chat_async, "CLIENT", logger::type_log::DEBUG, "Detect no data", &client);
-            logging.out(log_type::DEBUG, "Detect no data");
+            logging.out("WARNING", "Detect no data");
             stop(); return;
         }
         if (  ::requester::get_request(buffer, &info) < 0) {
@@ -245,7 +324,7 @@ void check( sockaddr_in client, int client_handle, ssl_st * ssl, bool secure)
         }
         memset(&buffer, 0, sizeof(buffer));
         if(info.request_info.path == "/") { info.request_info.path = ""; }
-        logging.out(log_type::LOG, (string) "Request: Method - " + (string) (info.request_info.method) +", path - " + (string) (info.request_info.path) + ", media_path - " +(string) (info.request_info.media_path) + ", body - " + (string) (info.body));
+        logging.out("LOG", (string) "Request: Method - " + (string) (info.request_info.method) +", path - " + (string) (info.request_info.path) + ", media_path - " +(string) (info.request_info.media_path) + ", body - " + (string) (info.body));
         //if (info.headers.contains("Content-Type"))
             //logging.out(log_type::DEBUG,(string) "\t\t---------------\nData info: \n" +(string) "\t\tContent type: " + (string) info.headers["Content-Type"].get<string>());
     }
@@ -255,19 +334,19 @@ void check( sockaddr_in client, int client_handle, ssl_st * ssl, bool secure)
                                                                                         info.request_info.path +
                                                                                         "\n Headers: " +
                                                                                         (string) info.headers, &client);*/
-        /*logging.out(log_type::ERROR, (string) "Error parsing! " +
+        logging.out("ERROR", (string) "Error parsing! " +
                                     (string) "\n Try check page: " +
                                     info.request_info.path +
                                     "\n Headers: " +
-                                    (string) info.headers);*/
+                                    (string) info.headers);
     }
     string compressed_data;
     try {
         requester::check_path data(path + PAGE_PATH + info.request_info.path);
         //async(launch::async, logger::log_chat_async, "CLIENT", logger::type_log::LOG,"Trying check by path: " + (string) (data.is_dir() ? data.path + "/main.html" : data.path), &client);
-        //logging.out(log_type::DEBUG, "Trying check by path: " + (string) (data.is_dir() ? data.path + "/main.html" : data.path));
+        //logging.out("DEBUG", "Trying check by path: " + (string) (data.is_dir() ? data.path + "/main.html" : data.path));
         responser::response rep;
-        if(main_data.config_Data["SERVER"]["CONFIG"]["MACHINE_INFO"].get<bool>()) {
+        if(main_data.machine_info) {
             struct utsname unameData;
             uname(&unameData);
             rep.header_body += "Architecture: " + (string) (unameData.machine) + "\r\n"
@@ -276,11 +355,10 @@ void check( sockaddr_in client, int client_handle, ssl_st * ssl, bool secure)
                                "Release: " + (string) (unameData.release) + "\r\n"
                                "Name: nginx\r\n";
         }
-        int proxy_ind = -1;
         if(app.is_api(info.request_info.path)){
             try {
                 //logging.out(log_type::DEBUG, "This is an api");
-            app.routes[info.request_info.path](&compressed_data, &rep, info, app.access);
+                app.routes[info.request_info.path](&compressed_data, &rep, info, app.access, static_cast< main_funcs* >(&main_data) );
             } catch(const std::exception err){}
         }
         else {
@@ -306,7 +384,7 @@ void check( sockaddr_in client, int client_handle, ssl_st * ssl, bool secure)
         (secure) ? SSL_write(ssl,rep.make_request().c_str(), rep.make_request().length()) : send(client_handle, rep.make_request().c_str(), rep.make_request().length(), MSG_NOSIGNAL);
     } catch (const std::exception& ex) {
         //async(launch::async, logger::log_chat_async, "CLIENT", logger::type_log::ERROR,"Error: " + (string) ex.what() + "\n Try check page: " + info.request_info.path, &client);
-        //logging.out(log_type::ERROR, "Error: " + (string) ex.what() + "\n Try check page: " + info.request_info.path);
+        logging.out("ERROR", "Error: " + (string) ex.what() + "\n Try check page: " + info.request_info.path);
         compressed_data = "Error response";
     }
     //sleep(1);
