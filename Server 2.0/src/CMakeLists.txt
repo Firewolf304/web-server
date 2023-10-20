@@ -8,10 +8,12 @@ add_executable(Server_2_0
         log_stream.cpp
         variables.h
         usings.h
+        sql.cpp
         ssl.cpp
         response.cpp
         globals.h
         include.h
+        collector.cpp
 )
 
 find_package(ZLIB)

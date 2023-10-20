@@ -16,5 +16,4 @@ using std::cout;
 using std::cin;
 using std::endl;
 using std::unordered_map;
-using log_type= firewolf::streams::logger;
 #endif //SERVER_2_0_USINGS_H

@@ -2,29 +2,30 @@
 #include <pqxx/pqxx>
 #include <string>
 #include <nlohmann/json.hpp>
+#include <future>
 using namespace std;
 
 namespace firewolf::sql {
-using namespace nlohmann;
-            /* elementary config like base constructor pqxx:
-                sql_dump server(json::parse(R"(
-                {
-                    "user" : "1234",
-                    "password" : "1234",
-                    "host" : "127.0.0.1",
-                    "port" : "1234",
-                    "dbname" : "1234",
-                    "target_session_attrs" : "read-write"
-                }
-                )"));
-            */
+    using namespace nlohmann;
+    /* elementary config like base constructor pqxx:
+        sql_dump server(json::parse(R"(
+        {
+            "user" : "1234",
+            "password" : "1234",
+            "host" : "127.0.0.1",
+            "port" : "1234",
+            "dbname" : "1234",
+            "target_session_attrs" : "read-write"
+        }
+        )"));
+    */
     class sql_dump {
     private:
         json config;
-
+        shared_ptr<pqxx::work> work;
         shared_ptr<pqxx::connection> client; // add dynamic value
     public:
-        shared_ptr<pqxx::work> work;
+        sql_dump () { }
         sql_dump (json configurate) {
             this->config = configurate;
             string request = "";
@@ -32,6 +33,19 @@ using namespace nlohmann;
                 request += data.key() + "=" + data.value().get<string>() + " ";
             }
             //request = "user=firewolf password=1633 host=127.0.0.1 port=8081 dbname=server_bot target_session_attrs=read-write";
+            try {
+                this->client = make_shared<pqxx::connection>(request);
+                this->work = make_shared<pqxx::work>(*(this->client));
+            } catch (const exception &e) {
+                throw std::runtime_error("Error connection");
+            }
+        }
+        void configure(json configurate) {
+            this->config = configurate;
+            string request = "";
+            for(auto data = config.begin(); data != config.end(); data++) {
+                request += data.key() + "=" + data.value().get<string>() + " ";
+            }
             try {
                 this->client = make_shared<pqxx::connection>(request);
                 this->work = make_shared<pqxx::work>(*(this->client));
@@ -58,9 +72,27 @@ using namespace nlohmann;
             }
         }
         ~sql_dump() {
-            //disconnect();
+            disconnect();
         }
+        void operator<< ( const string & text ) {
+            std::async(std::launch::async, [this, text]() {
+                pqxx::result r;
+                try {
+                    r = this->work->exec(text);
+                }
+                catch (const exception &e) {
+                    throw std::runtime_error(e.what());
+                }
 
+                for (auto const &row: r)
+                {
+                    for (auto const &field: row)
+                        std::cout << field.c_str() << '\t';
+                    std::cout << std::endl;
+                }
+            });
+
+        }
         class data {
         public:
             data(sql_dump* a) {
@@ -140,16 +172,16 @@ using namespace nlohmann;
             {
                 //string text = types::global_type().string_value[global_type] + " " + (types::global_type().is_not_none(global_type) ? "true" : "false");
                 string text = "CREATE TABLE " + name + " " +
-                        (types::global_type().is_not_none(global_type) ? types::global_type().to_string(global_type) + " " : "") +
-                        (types::temp_type().is_not_none(temp_type) ? types::temp_type().to_string(temp_type) + " " : "") +
-                        (unlogged ? "UNLOGGED " : "");
+                              (types::global_type().is_not_none(global_type) ? types::global_type().to_string(global_type) + " " : "") +
+                              (types::temp_type().is_not_none(temp_type) ? types::temp_type().to_string(temp_type) + " " : "") +
+                              (unlogged ? "UNLOGGED " : "");
                 text += "(\n";
                 if(!table_data.empty()) {
                     for(string d : table_data) {
                         text += "  " + d + "\n";
                     }
                 } text += ")" + (!tablespace.empty() ? " TABLESPACE " + tablespace + " " : "") + (!with.empty() ? "WITH (" + with + ") " : "") +
-                        (types::on_commit().is_not_none(on_commit) ? " ON COMMIT " + types::on_commit().to_string(on_commit) + " " : "");
+                          (types::on_commit().is_not_none(on_commit) ? " ON COMMIT " + types::on_commit().to_string(on_commit) + " " : "");
 
                 text += ";";
                 this->sql_return->work->exec(text);

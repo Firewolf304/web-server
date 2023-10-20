@@ -9,8 +9,9 @@ typedef int sock_handle;
 #include "include.h"
 
 
-
-
+//============Monitor
+firewolf::monitor::collect_connection client_map;
+//============Monitor
 string path;
 /*----epoll----*/
 int nfds = 20000;
@@ -38,6 +39,10 @@ string PAGE_PATH = "/pages";
 int timeout_client = -1;
 firewolf::ssl_space::SSL space(false, &secure_handle);
 vector<json> proxy_path;
+//============SQL
+sql::sql_dump sqller;
+//============SQL
+
 /*struct main_funcs {
     int * timeoutclient = &timeout_client;
     api * app_ptr = &app;
@@ -64,8 +69,12 @@ struct main_funcs {
     json config_Data;
     bool machine_info = false;
     vector<json> proxy_path;
+    firewolf::sql::sql_dump * server;
+    std::shared_ptr<sock_handle> sockserver;
+    firewolf::monitor::collect_connection * client_map;
     //std::shared_ptr<firewolf::streams::logger> output = output;
 };
-main_funcs main_data = {&logging, &timeout_client, &app, &ipAddr, port, &space, std::make_shared<int>(nfds), &PAGE_PATH, NULL, false, {} } ;
+main_funcs main_data = {&logging, &timeout_client, &app, &ipAddr, port, &space, std::make_shared<int>(nfds), &PAGE_PATH, NULL, false, {}, &sqller,
+                        std::make_shared<sock_handle>(sock), &client_map } ;
 
 #endif //SERVER_2_0_VARIABLES_H

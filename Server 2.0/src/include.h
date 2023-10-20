@@ -32,3 +32,5 @@
 #include "usings.h"
 #include <dlfcn.h>
 #include <curl/curl.h>
+#include "sql.cpp"
+#include "collector.cpp"

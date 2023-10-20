@@ -162,11 +162,6 @@ namespace firewolf::streams {
         ~logger() {
             this->stream.stop();
         }
-
-        logger set(std::string type) {
-            this->value_type = type;
-            return *this;
-        }
         std::string value_type = "";
         logger operator[] (const std::string value) {
             this->value_type = value;
