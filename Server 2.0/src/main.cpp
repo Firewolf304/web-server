@@ -1,5 +1,4 @@
 
-
 //
 //
 //
@@ -146,7 +145,7 @@ void accept_for(int client_handle) {
 
     std::async(std::launch::async, check, client, client_handle, ssl, secure);//check(client, client_handle);
 }
-int main(int argc, char* argv[]) {
+int main() {
     logging.config->show_id_thread = false;
     logging.config->wait = 1;
     //logging.allowed_type[log_type::DEBUG] = false;
@@ -156,10 +155,10 @@ int main(int argc, char* argv[]) {
     if(enable_ssl) {
         space.init();
     }
-    //char pwd[PATH_MAX];
-    //getcwd(pwd, sizeof(pwd));
-    path = (string)argv[0];
-    //memset(&pwd, 0, sizeof(pwd));
+    char pwd[PATH_MAX];
+    getcwd(pwd, sizeof(pwd));
+    path = (string)pwd;
+    memset(&pwd, 0, sizeof(pwd));
     memset(&servAddr, 0, sizeof(servAddr));
     servAddr.sin_family = AF_INET;
     servAddr.sin_addr.s_addr = inet_addr(ipAddr.c_str());
@@ -213,14 +212,17 @@ int main(int argc, char* argv[]) {
     }
     space.close();
     logging.close();
+
     return 0;
 }
+
+
 
 void check( sockaddr_in client, int client_handle, ssl_st * ssl, bool secure)
 {
     ::requester::request_data info;
     auto stop = [ssl, client_handle, secure]() {
-        client_map.clients.erase(client_handle);
+        //client_map.clients.erase(client_handle);
         if(secure) {
             SSL_shutdown(ssl); SSL_free(ssl); }
         close(client_handle);

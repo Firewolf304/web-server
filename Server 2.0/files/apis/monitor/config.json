@@ -1,4 +1,5 @@
 {
   "path": "/apis/monitor",
-  "lang" : "cpp"
+  "lang" : "cpp",
+  "type" : 0
 }

@@ -53,7 +53,8 @@
             "server", "date", "etag", "vary", "content-length", "x-render-origin-server", "alt-svc", "x-powered-by", "cf-ray"
           ]
 
-        }
+        },
+        "type" : 1
       }
     ]
   }
