@@ -146,7 +146,7 @@ void accept_for(int client_handle) {
     std::async(std::launch::async, check, client, client_handle, ssl, secure);//check(client, client_handle);
 }
 int main() {
-    logging.config->show_id_thread = false;
+    logging.config->show_id_thread = true;
     logging.config->wait = 1;
     //logging.allowed_type[log_type::DEBUG] = false;
     logging.config->format_type = "%D-%T";
@@ -175,7 +175,6 @@ int main() {
         exit(-1);
     }
     logging << "Binded ip address: " + (string)((secure_handle) ? "https://" : "http://") + (string)inet_ntoa(servAddr.sin_addr) + (string)":" + to_string(ntohs(servAddr.sin_port));
-
     listen(sock, 1000);
     if((epfd = epoll_create1(0)) < 0 ) {
         perror("Error create epoll");
@@ -220,7 +219,8 @@ int main() {
 
 void check( sockaddr_in client, int client_handle, ssl_st * ssl, bool secure)
 {
-    ::requester::request_data info;
+
+    requester::request_data info;
     auto stop = [ssl, client_handle, secure]() {
         //client_map.clients.erase(client_handle);
         if(secure) {
@@ -233,7 +233,7 @@ void check( sockaddr_in client, int client_handle, ssl_st * ssl, bool secure)
     //out.detach();
     char buffer[2048];
     try {
-        (secure) ? SSL_read(ssl, buffer, sizeof(buffer) - 1) : recv(client_handle, &buffer, sizeof(buffer), MSG_DONTWAIT );
+        (secure) ? SSL_read(ssl, buffer, sizeof(buffer) - 1) : recv(client_handle, &buffer, sizeof(buffer), MSG_PEEK );
         //async(launch::async, logger::log_chat_async, "CLIENT", logger::type_log::DEBUG, (string) "Connected client, status - " + ((secure) ? (string) "true" : (string) "false"), &client);
         logging.out("LOG", "Connected client: " + (string)inet_ntoa(client.sin_addr) + ":" + to_string(ntohs(client.sin_port)) + ", status - " + ((secure) ? (string) "true" : (string) "false"));
         logging.out("DEBUG", "ID socket = " + to_string(client_handle));

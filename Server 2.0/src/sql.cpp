@@ -59,11 +59,11 @@ namespace firewolf::sql {
                 request += data.key() + "=" + data.value().get<string>() + " ";
             }
             //request = "user=firewolf password=1633 host=127.0.0.1 port=8081 dbname=server_bot target_session_attrs=read-write";
-            /*try {
+            try {
                 //this->client = pqxx::connection(request);
             } catch (const exception &e) {
                 cout << "Error connection: " << e.what() << endl;
-            }*/
+            }
 
         }
         void disconnect() {
@@ -74,24 +74,20 @@ namespace firewolf::sql {
         ~sql_dump() {
             disconnect();
         }
-        void operator<< ( const string & text ) {
-            std::async(std::launch::async, [this, text]() {
-                pqxx::result r;
-                try {
-                    r = this->work->exec(text);
-                }
-                catch (const exception &e) {
-                    throw std::runtime_error(e.what());
-                }
+        pqxx::result operator<< ( const string & text ) {
+            try {
+                return this->work->exec(text);
+            }
+            catch (const exception &e) {
+                throw std::runtime_error(e.what());
+            }
+        }
+        template<typename... T>
+        pqxx::result operator<<(const std::tuple<T...>& values)
 
-                for (auto const &row: r)
-                {
-                    for (auto const &field: row)
-                        std::cout << field.c_str() << '\t';
-                    std::cout << std::endl;
-                }
-            });
+        {
 
+            //return os;
         }
         class data {
         public:
@@ -191,18 +187,9 @@ namespace firewolf::sql {
             }
         private:
             sql_dump* sql_return;
-            /*public:
-                data(shared_ptr<sql_dump> a) {
-                    sql_return = a;
-                }
-            private:
-                shared_ptr<sql_dump> sql_return;*/
         };
 
         data methods = data(this );
-
-
-
     };
 }
 

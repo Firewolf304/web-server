@@ -316,8 +316,9 @@ public:
 
                             char * error;
                         std::cout << "\t\tpath - " << file.path().string() + "/main.so" << std::endl;
-                            void *handle = dlopen((file.path().string() + "/main.so").c_str(),RTLD_LAZY);
-                            if(!handle) {
+                        try {
+                            void *handle = dlopen((file.path().string() + "/main.so").c_str(), RTLD_LAZY | RTLD_DEEPBIND);
+                            if (!handle) {
                                 std::cout << "\t\tcancel: cant open module\n";
                                 return;
                             }
@@ -326,7 +327,7 @@ public:
                                 std::cout << "\t\tcancel: cant load info (" << error << ")\n";
                                 return;
                             }
-                        std::cout << "\t\tinfo: " << (std::string)info() << std::endl;
+                            std::cout << "\t\tinfo: " << (std::string) info() << std::endl;
 
                             startFunc start = reinterpret_cast<startFunc>(dlsym(handle, "start"));
                             if ((error = dlerror()) != NULL) {
@@ -335,23 +336,28 @@ public:
                             }
                             map_handles[path] = handle;
                             map_funcs[path] = start;
-                            routes[path] = [this](std::string * s, responser::response* rep, requester::request_data req, std::unordered_map<std::string, json> access_info, void* funcs ) {
+                            routes[path] = [this](std::string *s, responser::response *rep, requester::request_data req,
+                                                  std::unordered_map<std::string, json> access_info, void *funcs) {
 
                                 try {
                                     auto handshake = [](int sig) -> void {
-                                        throw std::runtime_error( "something wrong with api" );
+                                        throw std::runtime_error("something wrong with api");
                                     };
                                     signal(SIGSEGV, handshake);
-                                     map_funcs[req.request_info.path](s, rep, req, funcs);
-                                } catch (std::exception& e) {
-                                    *s+="[api error]";
-                                    std::cout << e.what() << "\n\tIt is -> " + req.request_info.path << std::endl;
+                                    map_funcs[req.request_info.path](s, rep, req, funcs);
+                                } catch (std::exception &e) {
+                                    *s += "[api error]";
+                                    std::cerr << e.what() << "\n\tIt is -> " + req.request_info.path << std::endl;
                                 }
                             };
                             //start(s, rep, req);
                             delete error;
                             free(error);
                         }
+                        catch (const std::runtime_error& e) {
+                            std::cout << "Error run: " << e.what() << std::endl;
+                        }
+                    }
                     },
                     {"csharp", [this, file, path]() {
                             routes[path] = [this](std::string *s, responser::response *rep,

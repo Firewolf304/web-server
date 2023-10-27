@@ -37,7 +37,7 @@ public:
                 json js = js.parse(this->read_file(file.path().string() + "/config.json"));
                 cout<< "\t" << file.path().filename() << endl;
                 char * error;
-                void *handle = dlopen((file.path().string() + "/main.so").c_str(),RTLD_LAZY);
+                void *handle = dlopen((file.path().string() + "/main.so").c_str(),RTLD_LAZY | RTLD_DEEPBIND);
                 if(!handle) {
                     std::cout << "\t\tcancel: cant open module\n";
                     return;

@@ -58,7 +58,7 @@ sql::sql_dump sqller;
 } main_data;*/
 
 struct main_funcs {
-    firewolf::streams::logger * log;
+    firewolf::streams::logger* log;
     int * timeoutclient;
     api * app_ptr;
     string * ip;
@@ -74,7 +74,7 @@ struct main_funcs {
     firewolf::monitor::collect_connection * client_map;
     //std::shared_ptr<firewolf::streams::logger> output = output;
 };
-main_funcs main_data = {&logging, &timeout_client, &app, &ipAddr, port, &space, std::make_shared<int>(nfds), &PAGE_PATH, NULL, false, {}, &sqller,
-                        std::make_shared<sock_handle>(sock), &client_map } ;
+main_funcs main_data = {&logging, &timeout_client, &app, &ipAddr, port, &space, std::make_shared<int>(nfds), &PAGE_PATH,
+                        NULL, false, {}, &sqller, std::make_shared<sock_handle>(sock), &client_map } ;
 
 #endif //SERVER_2_0_VARIABLES_H
