@@ -43,3 +43,7 @@ target_link_libraries(Server_2_0 mono-2.0)
 find_package(OpenSSL REQUIRED)
 
 target_link_libraries(Server_2_0 curl)
+
+find_package(PythonLibs REQUIRED)
+include_directories(${PYTHON_INCLUDE_DIRS})
+target_link_libraries(Server_2_0 ${PYTHON_LIBRARIES})

@@ -42,7 +42,7 @@ void read_cfg() {
     }catch (const std::exception& e) {
         cout << "Error connect to SQL: " << e.what() << endl;
     }
-    cout<< "Proxy pathes:" << endl;
+    cout<< "------------------\nProxy pathes:" << endl;
     for(json data : main_data.proxy_path) {
         cout << "\t" + data["PATH"].get<string>() + (string)" to " + data["ADRESS"].get<string>() << endl;
         main_data.app_ptr->access[data["PATH"]] = data;
@@ -84,13 +84,22 @@ void read_cfg() {
                     curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, static_cast<size_t(*)(char*,size_t, size_t, void*)>(get_data));
                     curl_easy_setopt(curl, CURLOPT_HEADERDATA, &headers);
                     // ----------------- get data options -----------------
-                    CURLcode res = curl_easy_perform(curl); // run request
+                    /*CURLcode res = curl_easy_perform(curl); // run request
                     if (res != CURLE_OK) {
                         char error[256];
                         ERR_error_string(res, static_cast<char *>(error));
                         throw std::runtime_error("CURL NOT OK: " + (string)error );
                         delete[] &error;
-                    }
+                    }*/
+                    CURLM* multi_handle = curl_multi_init();
+                    curl_multi_add_handle(multi_handle, curl);
+                    int still_running = 0;
+                    do {
+                        curl_multi_perform(multi_handle, &still_running);
+                    } while (still_running);
+                    curl_multi_remove_handle(multi_handle, curl);
+                    curl_easy_cleanup(curl);
+                    curl_multi_cleanup(multi_handle);
                     headers = firewolf::requester::pop_line(headers, "HTTP/2 200", "\r\n");
                     if (access_info[req.request_info.path]["RESPONSE_CONFIG"]["REMOVE_HEADERS"].get<bool>()) {
                         auto array = access_info[req.request_info.path]["RESPONSE_CONFIG"]["REMOVE_HEADERS_NAME"];
@@ -146,11 +155,13 @@ void accept_for(int client_handle) {
     std::async(std::launch::async, check, client, client_handle, ssl, secure);//check(client, client_handle);
 }
 int main() {
-    logging.config->show_id_thread = true;
+    logging.config->show_id_thread = false;
     logging.config->wait = 1;
     //logging.allowed_type[log_type::DEBUG] = false;
     logging.config->format_type = "%D-%T";
     read_cfg();
+    app.init();
+
     evlist = new epoll_event[nfds];
     if(enable_ssl) {
         space.init();
@@ -202,7 +213,6 @@ int main() {
                 ret = epoll_ctl(epfd, EPOLL_CTL_ADD, client_handle, &ev);
             }
             else {
-
                 std::async(std::launch::async, accept_for, (int)evlist[i].data.fd);
             }
             i++;

@@ -182,7 +182,23 @@ namespace firewolf::sql {
                 text += ";";
                 this->sql_return->work->exec(text);
             }
-            void insert_table(string name) {
+            void ListOFTables(string name) {
+                string command = "create table out(bd_name text, schema_name text, table_name text, column_name text, data_type text);\n"
+                                 "truncate out;\n"
+                                 "do $$\n"
+                                 "declare\n"
+                                 "db text;\n"
+                                 "dbb text;\n"
+                                 "begin\n"
+                                 "   create table temparr as select array(select datname from pg_catalog.pg_database where datname != 'postgres' and datname != 'template0' and datname != 'template1') as arr;\n"
+                                 "   for i in 1..cardinality(arr) from temparr loop\n"
+                                 "   db = arr[i] from temparr;\n"
+                                 "   raise notice 'Insert into table: %', db;\n"
+                                 "   dbb = 'dbname='||db;\n"
+                                 "   insert into out select db, *\n"
+                                 "   from dblink(dbb, 'select table_schema, table_name, column_name, data_type from information_schema.columns where table_schema =     ''public'' order by table_name, column_name') as (schema_name text, table_name text, column_name text, data_type text);\n"
+                                 "   end loop;\n"
+                                 "end $$;";
 
             }
         private:

@@ -14,7 +14,7 @@
 #include <zlib.h>
 #include <fstream>
 #include <functional>
-
+#include <Python.h>
 #include "nlohmann/json.hpp"
 
 typedef int sock_handle;
@@ -274,9 +274,10 @@ private:
     typedef const char* (*InfoFunc)();
     typedef void (*startFunc)(std::string*, responser::response*, requester::request_data, void*  );
 public:
-    std::unordered_map<std::string, std::function<void(std::string*, responser::response*, requester::request_data, std::unordered_map<std::string, json>, void* )>> routes;
-    std::unordered_map<std::string, startFunc> map_funcs;
-    std::unordered_map<std::string, void*> map_handles;
+    std::unordered_map<std::string, std::function<void(std::string*, responser::response*, requester::request_data, std::unordered_map<std::string, json>, void* )>> routes;    // functions run
+    std::unordered_map<std::string, startFunc> map_funcs;                                                                                                                       // map of .so main functions
+    std::unordered_map<std::string, void*> map_handles;                                                                                                                         // handles run
+
     std::string path_dirs = "/apis";
     std::string app_path = "";
     std::unordered_map<std::string, json> access;
@@ -292,7 +293,8 @@ public:
         }
         return text;
     }
-    api()
+    api() {  }
+    void init()
     {
 
         char buff[PATH_MAX];
@@ -336,9 +338,7 @@ public:
                             }
                             map_handles[path] = handle;
                             map_funcs[path] = start;
-                            routes[path] = [this](std::string *s, responser::response *rep, requester::request_data req,
-                                                  std::unordered_map<std::string, json> access_info, void *funcs) {
-
+                            routes[path] = [this](std::string *s, responser::response *rep, requester::request_data req, std::unordered_map<std::string, json> access_info, void *funcs) {
                                 try {
                                     auto handshake = [](int sig) -> void {
                                         throw std::runtime_error("something wrong with api");
@@ -360,12 +360,7 @@ public:
                     }
                     },
                     {"csharp", [this, file, path]() {
-                            routes[path] = [this](std::string *s, responser::response *rep,
-                                                                                   requester::request_data req,
-                                                                                   std::unordered_map<std::string, json> access_info, void* funcs ) {
-
-                                //map_funcs[req.request_info.path](s, rep, req);
-
+                            routes[path] = [this](std::string *s, responser::response *rep, requester::request_data req, std::unordered_map<std::string, json> access_info, void* funcs ) {
                                 MonoDomain *domain;
                                 try {
                                     //domain = mono_jit_init(file.path().string().c_str());
@@ -400,6 +395,160 @@ public:
                                 catch (const std::exception &exp) { mono_jit_cleanup(domain); }
                             };
                         }
+                    },
+                    {"py", [this, file, path]() {
+                        Py_Initialize();
+                        try {
+                            auto error = [this]() {
+                                if (PyErr_Occurred()) {
+                                    PyObject *pType, *pValue, *pTraceback;
+                                    PyErr_Fetch(&pType, &pValue, &pTraceback);
+                                    PyErr_NormalizeException(&pType, &pValue, &pTraceback);
+                                    if (pValue != NULL) {
+                                        PyObject *pStrErrorMessage = PyObject_Str(pValue);
+                                        throw std::runtime_error("Python error run: " + (std::string)(PyUnicode_AsUTF8(pStrErrorMessage)));
+                                        Py_XDECREF(pStrErrorMessage);
+                                    }
+                                    Py_XDECREF(pType);
+                                    Py_XDECREF(pValue);
+                                    Py_XDECREF(pTraceback);
+                                }
+                                else {
+                                    throw std::runtime_error("Error run");
+                                }
+                            };
+
+                            std::cout << "\t\tpath - " << file.path().string() << "/main.py" << std::endl;
+                            PyObject * sysPath = PySys_GetObject("path");
+                            if (sysPath) {
+                                PyObject * pather = PyUnicode_DecodeFSDefault(
+                                        (file.path().string()).c_str());
+                                PyList_Append(sysPath, pather);
+                                map_handles[path] = static_cast<void*>(pather);
+                                Py_INCREF(pather);
+                                //Py_XDECREF(path);
+                            } else {
+                                error();
+                            }
+                            PyObject* handle = PyImport_ImportModule("main");
+
+                            if (handle != NULL) {
+                                /*=========================INFO CHECK=========================*/
+                                PyObject* pDict = PyModule_GetDict(handle);
+                                PyObject* pFunction = PyDict_GetItemString(pDict, "info");
+                                if (pFunction != NULL) {
+                                    if(PyCallable_Check(pFunction))
+                                    {
+                                        PyObject* pResult;
+                                        pResult = PyObject_CallFunction(pFunction, NULL);
+                                        PyObject* pResultStr = PyObject_Repr(pResult);          // run
+                                        std::cout << "\t\tinfo: " << PyUnicode_AsUTF8(pResultStr)  << std::endl;
+                                        Py_DECREF(pResult);
+                                        Py_DECREF(pResultStr);
+                                    }
+                                } else {
+                                    error();
+                                }
+                                /*=========================INFO CHECK=========================*/
+                                /*=========================START=========================*/
+                                routes[path] = [this, file](std::string *s, responser::response *rep, requester::request_data req, std::unordered_map<std::string, json> access_info, void* funcs ) {
+                                    Py_Initialize();
+                                    try {
+                                        auto handshake = [](int sig) -> void {
+                                            throw std::runtime_error("something wrong with api");
+                                        };
+                                        signal(SIGSEGV, handshake);
+                                        signal(SIGABRT, handshake);
+                                        PyObject * sysPath = PySys_GetObject("path");
+                                        if (sysPath) {
+                                            PyList_Append(sysPath, static_cast<PyObject *>(map_handles[req.request_info.path]));
+                                        } else {
+                                            throw std::runtime_error("Error link path");
+                                        }
+                                        //PyObject * pDict = PyModule_GetDict(reinterpret_cast<PyObject *>(map_handles[req.request_info.path]));
+                                        PyObject* handle = PyImport_ImportModule("main");
+                                        if (handle != NULL) {
+                                            PyObject * pDict = PyModule_GetDict(handle);
+                                            /*std::cout << "find: " << PyDict_Size(pDict) << " values" << std::endl;
+                                            PyObject * keys = PyDict_Keys(pDict);
+                                            for (Py_ssize_t i = 0; i < PyList_Size(keys); ++i) {
+                                                PyObject * key = PyList_GetItem(keys, i);
+                                                if (PyUnicode_Check(key)) {
+                                                    std::cout << "\t\tKey: " << PyUnicode_AsUTF8(key) << std::endl;
+                                                }
+                                                Py_DECREF(key);
+                                            }
+                                            Py_DECREF(keys);*/
+                                            PyObject * start = PyDict_GetItemString(pDict, "start");
+                                            Py_DECREF(pDict);
+                                            if (start != NULL) {
+                                                if (PyCallable_Check(start)) {
+                                                    PyObject * pResult;
+                                                    PyObject * d = PyDict_New();
+                                                    /*struct convert*/
+
+                                                    PyDict_SetItemString(d, "request_info", PyUnicode_FromString(
+                                                            ("{\"path\":\"" + req.request_info.path + "\","
+                                                                                                      "\"media_path\":\"" +
+                                                             req.request_info.media_path + "\","
+                                                                                           "\"method\":\"" +
+                                                             req.request_info.method + "\","
+                                                                                       "\"protocol\":\"" +
+                                                             req.request_info.protocol + "\"}").c_str()));
+                                                    PyDict_SetItemString(d, "body",
+                                                                         PyUnicode_FromString(req.body.c_str()));
+                                                    PyDict_SetItemString(d, "headers", PyUnicode_FromString(
+                                                            req.headers.dump().c_str()));
+                                                    PyDict_SetItemString(d, "json_data", PyUnicode_FromString(("{\"pwd\": \"" + file.path().string() + "\"}").c_str()));
+                                                    //pResult = PyObject_CallFunctionObjArgs(start, d);       // run
+                                                    pResult = PyObject_CallOneArg(start, d);       // run
+                                                    //PyObject * keys = PyDict_Keys(pResult);
+                                                    if (PyDict_Check(pResult)) {
+                                                        /*for (Py_ssize_t i = 0; i < PyList_Size(keys); ++i) {
+                                                            PyObject * key = PyList_GetItem(keys, i);
+                                                            if (PyUnicode_Check(key)) {
+                                                                std::cout << "\t\tKey: " << PyUnicode_AsUTF8(key) << std::endl;
+                                                            }
+                                                            Py_DECREF(key);
+                                                        }*/
+                                                        /*for (Py_ssize_t i = 0; i < PyList_Size(keys); ++i) {
+                                                            PyObject* key = PyList_GetItem(keys, i);
+                                                            PyObject* value = PyDict_GetItem(pResult, key);
+                                                            std::cout << PyUnicode_AsUTF8(key) << ": " << PyUnicode_AsUTF8(value) << std::endl;
+                                                        }*/
+                                                        *s = (std::string) PyUnicode_AsUTF8(PyDict_GetItemString(pResult, ((std::string)("body_text")).c_str()));
+                                                        rep->header_body += (std::string)PyUnicode_AsUTF8(PyDict_GetItemString(pResult, "header_body"));
+                                                    }
+                                                    Py_DECREF(pResult);
+                                                    //Py_DECREF(keys);
+                                                    Py_DECREF(d);
+                                                }
+                                            } else {
+                                                throw std::runtime_error("error find start");
+                                            }
+                                            //Py_DECREF(handle);
+                                            Py_DECREF(start);
+                                        }
+                                        else {
+                                            throw std::runtime_error("handle is null");
+                                        }
+                                    } catch (std::exception &e) {
+                                        *s = "[api error]";
+                                        std::cerr << e.what() << "\n\tIt is -> " + req.request_info.path << std::endl;
+                                    }
+                                    Py_Finalize();
+                                };
+                                /*=========================START=========================*/
+                            }
+                            else {
+                                error();
+                            }
+                            Py_Finalize();
+                        }
+                        catch (const std::runtime_error& err) {
+                            std::cout << "\t\tError run: " << err.what() << std::endl;
+                        }
+                    }
                     }
 
                 };
@@ -435,6 +584,7 @@ public:
                 };*/
             }
         }
+        std::cout << "------------------" << std::endl;
         /*routes["/api"] = [](string * s, responser::response *rep, requester::request_data req){
             if(req.request_info.method == "POST")
             {

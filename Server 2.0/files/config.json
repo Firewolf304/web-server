@@ -13,7 +13,8 @@
         {"ALL" :  0}
       ],
       "MODULES" : {
-        "ENABLE" : true
+        "ENABLE" : true,
+        "ENABLED_LANGS" : ["py", "cpp", "csharp"]
       }
     },
     "SSL" : {

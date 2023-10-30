@@ -1,0 +1,15 @@
+{
+  "path": "/apis/pyhello",
+  "lang" : "py",
+  "type" : 0,
+  "SQL" : {
+    "CONFIG" : {
+      "user" : "firewolf",
+      "password" : "1234",
+      "host" : "127.0.0.1",
+      "port" : "8081",
+      "dbname" : "server_bot",
+      "target_session_attrs" : "read-write"
+    }
+  }
+}
