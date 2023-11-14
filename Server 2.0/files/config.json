@@ -1,4 +1,3 @@
-
 {
   "SERVER" : {
     "CONFIG" : {
@@ -9,10 +8,6 @@
       "PATH_PAGES": "/pages",
       "MACHINE_INFO" : false,
       "EPOLLS_COUNT" : 20000,
-      "ACCESS" : [
-        {"ADMIN" :  1000},
-        {"ALL" :  0}
-      ],
       "MODULES" : {
         "PATH" : "/apis",
         "ENABLE" : true,
@@ -20,21 +15,21 @@
       },
       "MODS" : {
         "PATH" : "/modules",
-        "ENABLE" : false
+        "ENABLE" : true
       }
     },
     "SSL" : {
       "ENABLE" : false
     },
     "SQL" : {
-        "CONFIG" : {
-          "user" : "firewolf",
-          "password" : "1234",
-          "host" : "127.0.0.1",
-          "port" : "8081",
-          "dbname" : "server_bot",
-          "target_session_attrs" : "read-write"
-        }
+      "CONFIG" : {
+        "user" : "firewolf",
+        "password" : "1234",
+        "host" : "127.0.0.1",
+        "port" : "8081",
+        "dbname" : "server_bot",
+        "target_session_attrs" : "read-write"
+      }
     },
     "CUDA_MACHINE" : {
       "ENABLE" : false
@@ -43,6 +38,7 @@
   "PROXY_SERVER" : {
     "PROXY" : [
       {
+        "METHOD": "curl",
         "PATH" :  "/apis/rand",
         "PROTOCOL" : "https" ,
         "ADRESS" :  "api.rand.by",
