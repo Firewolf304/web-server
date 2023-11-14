@@ -1,0 +1,7 @@
+{
+  "version" : "0.0.1",
+  "name" : "gRPC_server",
+  "STATE" : "server",
+  "IP" : "127.0.0.1",
+  "PORT" : 2717
+}

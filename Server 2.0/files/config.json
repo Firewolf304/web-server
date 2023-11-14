@@ -1,3 +1,4 @@
+
 {
   "SERVER" : {
     "CONFIG" : {
@@ -13,8 +14,13 @@
         {"ALL" :  0}
       ],
       "MODULES" : {
+        "PATH" : "/apis",
         "ENABLE" : true,
         "ENABLED_LANGS" : ["py", "cpp", "csharp"]
+      },
+      "MODS" : {
+        "PATH" : "/modules",
+        "ENABLE" : false
       }
     },
     "SSL" : {
