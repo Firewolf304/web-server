@@ -1,0 +1,35 @@
+[
+  {
+    "PATH": "/apis/pyhello",
+    "ALLOW": false,
+    "METHOD": "basic",
+    "REASON": 0,
+    "GOTO" : "/login",
+    "LEVEL": 0
+  },
+  {
+    "PATH": "/apis/hello",
+    "ALLOW": true,
+    "METHOD": "basic",
+    "REASON": 0,
+    "GOTO" : "/login",
+    "LEVEL": 0
+  },
+  {
+    "PATH": "/apis/tools",
+    "ALLOW": true,
+    "METHOD": "basic",
+    "REASON": 0,
+    "GOTO" : "/login",
+    "LEVEL": 0
+  },
+  {
+    "PATH": "\\/login(?:\\/[\\w.-]+)*",
+    "ALLOW": true,
+    "METHOD": "basic",
+    "REASON": 0,
+    "GOTO" : "",
+    "LEVEL": 0
+  }
+
+]

@@ -1,0 +1,20 @@
+body {
+    background-color: #000;
+}
+.json-list {
+    list-style-type: disc;
+}
+
+.json-object {
+    text-decoration: none;
+    color: #629bf8;
+    cursor: pointer;
+}
+.json-object:hover {
+    text-decoration: underline;
+}
+
+.hidden {
+    display: none;
+    visibility: hidden;
+}

@@ -1,0 +1,67 @@
+#box{
+    position: absolute;
+    top: 20px; right: 20px;
+    display: flex;
+
+    width: 350px;
+    height: 400px;
+    border: solid 2px black;
+}
+#background{
+    z-index: -1;
+    position: fixed;
+    top:0%;
+    left: 0%;
+    height: 100%;
+    width: 100%;
+    color: white;
+}
+#body{
+    z-index: 1;
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    padding:0;
+    color: white;
+}
+#linker {
+    font-size: 30px;
+    font-style: italic;
+    font-weight: normal;
+}
+#linker:visited {
+    color: red;
+}
+#linker:active {
+  color: blue;
+}
+
+
+.json-list {
+    z-index: 2;
+    list-style-type: disc;
+}
+
+.json-object {
+    z-index: 2;
+    text-decoration: none;
+    color: #d8b1ff;
+    cursor: pointer;
+}
+.json-object:hover {
+    text-decoration: underline;
+}
+
+.hidden {
+    display: none;
+    visibility: hidden;
+}
+a:link {
+    text-decoration: none; /* Убирает подчеркивание для ссылок */
+}
+a:visited { text-decoration: none; }
+a:active { text-decoration: none; }
+a:hover {
+    text-decoration: underline; /* Делает ссылку подчеркнутой при наведении на нее курсора */
+    color: red; /* Цвет ссылки */
+}

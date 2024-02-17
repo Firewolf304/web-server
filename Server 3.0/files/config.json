@@ -1,0 +1,86 @@
+{
+  "SERVER" : {
+    "CONFIG" : {
+      "MODE" : "basic",
+      "IP" : "127.0.0.1",
+      "PORT" : 82,
+      "WAIT" : 10,
+      "PATH_PAGES": "/pages",
+      "MACHINE_INFO" : false,
+      "EPOLLS_COUNT" : 20000,
+      "MODULES" : {
+        "PATH" : "/apis",
+        "ENABLE" : true,
+        "ENABLED_LANGS" : ["py", "cpp", "csharp"]
+      },
+      "MODS" : {
+        "PATH" : "/modules",
+        "ENABLE" : true
+      }
+    },
+    "SSL" : {
+      "ENABLE" : false
+    },
+    "SQL" : {
+      "CONFIG" : {
+        "user" : "postgres",
+        "password" : "1633",
+        "host" : "127.0.0.1",
+        "port" : "5432",
+        "dbname" : "sql_test",
+        "target_session_attrs" : "read-write"
+      }
+    },
+    "CUDA_MACHINE" : {
+      "ENABLE" : false
+    }
+  },
+  "PROXY_SERVER" : {
+    "PROXY" : [
+      {
+        "METHOD": "curl",
+        "PATH" :  "/apis/rand",
+        "PROTOCOL" : "https" ,
+        "ADRESS" :  "api.rand.by",
+        "PORT": "",
+        "PROXY_PATH" : "/v1/integer",
+        "HEADERS" :  { "Host": "api.rand.by", "Accept": "*/*","Host": "api.rand.by","Connection": "close" },
+        "CONFIG_HEADERS" : {
+          "CUSTOM_HEAD_REQUEST" : "GET /v1/integer HTTP/1.1\n",
+          "USE_CLIENT_HEADERS" : false,
+          "REMOVE_CLIENT_HEADERS" : ["sec-ch-ua-platform", "Connection"]
+        },
+        "RESPONSE_CONFIG" : {
+          "REMOVE_HEADERS": true,
+          "REMOVE_HEADERS_NAME" : [
+            "server", "date", "etag", "vary", "content-length", "x-render-origin-server", "alt-svc", "x-powered-by", "cf-ray"
+          ]
+
+        },
+        "type" : 1
+      },
+      {
+        "METHOD": "move",
+        "PATH" :  "/apis/rand_float",
+        "PROTOCOL" : "https" ,
+        "ADRESS" :  "api.rand.by",
+        "PORT": "",
+        "PROXY_PATH" : "/v1/float",
+        "HEADERS" :  { "Host": "api.rand.by", "Accept": "*/*","Host": "api.rand.by","Connection": "close" },
+        "CONFIG_HEADERS" : {
+          "CUSTOM_HEAD_REQUEST" : "GET /v1/integer HTTP/1.1\n",
+          "USE_CLIENT_HEADERS" : false,
+          "REMOVE_CLIENT_HEADERS" : ["sec-ch-ua-platform", "Connection"]
+        },
+        "RESPONSE_CONFIG" : {
+          "REMOVE_HEADERS": true,
+          "REMOVE_HEADERS_NAME" : [
+            "server", "date", "etag", "vary", "content-length", "x-render-origin-server", "alt-svc", "x-powered-by", "cf-ray"
+          ]
+
+        },
+        "type" : 1
+      }
+    ]
+  }
+}
