@@ -21,7 +21,7 @@
 #include <zlib.h>
 #include <fstream>
 #include <future>
-#include <sys/epoll.h>
+//#include <sys/epoll.h>
 #include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/in.h>

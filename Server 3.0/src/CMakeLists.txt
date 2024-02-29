@@ -1,3 +1,4 @@
+include(FetchContent)
 cmake_minimum_required(VERSION 3.27)
 project(Server_3_0)
 
@@ -41,8 +42,8 @@ target_link_libraries(Server_3_0 nlohmann_json::nlohmann_json)
 find_package(OpenSSL REQUIRED)
 target_link_libraries(Server_3_0 OpenSSL::SSL)
 
-include_directories(/usr/include/mono-2.0)
-target_link_libraries(Server_3_0 mono-2.0)
+#include_directories(/usr/include/mono-2.0)
+#target_link_libraries(Server_3_0 mono-2.0)
 
 find_package(OpenSSL REQUIRED)
 find_package(PkgConfig REQUIRED) # Include functions provided by PkgConfig module.
@@ -63,3 +64,10 @@ include_directories( /usr/include/python3.11)
 find_package(Lua51 REQUIRED)
 include_directories(/usr/local/include ${LUA_INCLUDE_DIR})
 target_link_libraries(Server_3_0 ${LUA_LIBRARIES})
+FetchContent_Declare(
+        liburing4cpp
+        GIT_REPOSITORY https://github.com/CarterLi/liburing4cpp.git
+        GIT_TAG        async
+)
+FetchContent_MakeAvailable(liburing4cpp)
+target_link_libraries(Server_3_0 liburing4cpp)

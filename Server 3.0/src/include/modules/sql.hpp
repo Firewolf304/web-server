@@ -4,6 +4,8 @@
 
 #ifndef SERVER_2_0_SQL_H
 #define SERVER_2_0_SQL_H
+
+
 #include "../include.hpp"
 using namespace std;
 
@@ -49,6 +51,16 @@ namespace firewolf::sql {
         ~sql_dump() {
             disconnect();
         }
+        bool is_alive() {
+            if(this->client != nullptr && client->sock() > 0) {
+                try {
+                    return client->is_open();
+                } catch (std::runtime_error const & e) {
+                    return false;
+                }
+            }
+            return false;
+        }
         // exec without save
         pqxx::result operator < ( const string & text )  {
             try {
@@ -63,6 +75,7 @@ namespace firewolf::sql {
         // exec with save
         pqxx::result operator << ( const string & text ) {
             try {
+                if(!is_alive()) throw std::runtime_error("SQL not alive");;
                 auto active_conn = configure();
                 pqxx::work worker (*active_conn);
                 auto result = worker.exec(text);

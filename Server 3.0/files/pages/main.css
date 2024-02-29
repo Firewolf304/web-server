@@ -1,4 +1,4 @@
-#box{
+#api{
     position: absolute;
     top: 20px; right: 20px;
     display: flex;
@@ -35,7 +35,13 @@
 #linker:active {
   color: blue;
 }
-
+#name_list {
+    position: absolute;
+    top: 2%;
+    left: 40%;
+    z-index: 2;
+    color: red;
+}
 
 .json-list {
     z-index: 2;

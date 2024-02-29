@@ -258,6 +258,9 @@ namespace firewolf::requester{
     inline int get_request(char * buffer, request_data * data) {
         try {
             std::vector<std::string> body = save_split(buffer, '\n');
+            if(body.empty() || body.size() < 3) {
+                throw std::runtime_error("no body");
+            }
             std::vector<std::string> info = save_split(body[0], ' ');
             try {
                 if (info.size() > 2) {
@@ -270,7 +273,8 @@ namespace firewolf::requester{
                     data->request_info.protocol = info[2];
                 }
             }
-            catch(const std::out_of_range& e) { return -1; } catch(std::exception e) { return -1; }
+            catch(const std::out_of_range& e) { return -1; }
+            catch(std::exception const & e) { return -1; }
             std::vector<std::string> deflare_path = save_split(data->request_info.path, '?');
             if(deflare_path.size() > 1){
                 data->request_info.path = deflare_path[0];
@@ -281,7 +285,8 @@ namespace firewolf::requester{
             data->body = get_line_ready((std::string)buffer, "\r\n\r\n");
             data->headers = headers_to_json((std::string)buffer);
         }
-        catch (const std::exception e) { return -1;}
+        catch (const std::runtime_error & e) { return -1;}
+        catch (const std::exception & e) { return -1;}
         return 1;
     }
     inline std::string pop_line (std::string text, std::string from, std::string to) {
@@ -338,7 +343,7 @@ namespace firewolf::requester{
                 {".zip", "application/zip"},
                 {".ico", "image/x-icon"}
         };
-        check_path(std::string path) {
+        check_path(std::string & path) {
             if(this->is_dir(path)) {
                 path+="/main.html";
             }
@@ -351,7 +356,12 @@ namespace firewolf::requester{
         {
             return is_directory(this->info);
         }
-        bool is_dir(std::string value)
+        bool is_dir(std::string &value)
+        {
+            const std::filesystem::path information(value);
+            return is_directory(information);
+        }
+        bool is_dir(const std::string &value)
         {
             const std::filesystem::path information(value);
             return is_directory(information);
@@ -366,7 +376,7 @@ namespace firewolf::requester{
             }
             return format["txt"];
         }
-        bool has_format(std::string value)
+        bool has_format(std::string & value)
         {
             if(format.find(value) != format.end())
             {
@@ -381,7 +391,7 @@ namespace firewolf::requester{
         CLOSE_CLIENT = 2,   // fuck client
         ALLOWED = 3,
     };
-    using readyFunc = std::pair<reason, std::string>(requester::request_data&, json::iterator&, std::string pwd);
+    using readyFunc = std::pair<reason, std::string>(requester::request_data&, json::iterator&, std::string & pwd);
     /*class access_object {
     public:
         std::future<reason>& func;
@@ -397,7 +407,7 @@ namespace firewolf::requester{
         std::string access;
         std::string pwd;
         std::unordered_map<std::string,std::function<readyFunc>> funcs = {
-                {"basic", [](requester::request_data &request, json::iterator & info, std::string pwd)->std::pair<reason, std::string> {
+                {"basic", [](requester::request_data &request, json::iterator & info, std::string & pwd)->std::pair<reason, std::string> {
                     /*
                      DB Example:
                         [
@@ -470,7 +480,7 @@ namespace firewolf::requester{
             this->pwd = std::string(pwd);
             memset(&pwd, 0, sizeof(pwd));
         }
-        std::pair<reason, std::string> check(requester::request_data request) {
+        std::pair<reason, std::string> check(requester::request_data & request) {
             if(!this->data.is_array()) {
                 return {ALLOWED, ""};
             }
@@ -533,6 +543,11 @@ public:
         return text;
     }
     api() {  }
+    ~api() {
+        for(auto d : map_handles) {
+            dlclose(d.second);
+        }
+    }
     void init() {
         char buff[PATH_MAX];
         //std::string buff;
@@ -552,7 +567,7 @@ public:
                 access[path] = info;
 
                 std::unordered_map<std::string, std::function<void()>> switch_lang = {
-                        {"cpp",  [this, file, path] () {
+                        {"cpp",  [this, &file, &path] () {
 
                             char * error;
                             std::cout << "\t\tpath - " << file.path().string() + "/main.so" << std::endl;
@@ -597,46 +612,8 @@ public:
                             catch (const std::runtime_error& e) {
                                 std::cout << "Error run: " << e.what() << std::endl;
                             }
-                        }
-                        },
-                        /*{"csharp", [this, file, path]() {
-                            routes[path] = [this](std::string *s, responser::response *rep, requester::request_data req, std::unordered_map<std::string, json> access_info, void* funcs ) {
-                                MonoDomain *domain;
-                                try {
-                                    //domain = mono_jit_init(file.path().string().c_str());
-                                    domain = mono_jit_init((app_path + path_dirs + req.request_info.path).c_str());
-                                    std::cout << app_path + path_dirs + req.request_info.path + "/main.dll" << std::endl;
-                                    MonoAssembly *assembly = mono_domain_assembly_open(domain, "/main.dll");
-                                    if (assembly) {
-                                        MonoImage *image = mono_assembly_get_image(assembly);
-                                        std::string functionName = "DLLcs.Clas2:Hello";
-                                        MonoMethodDesc *methodDesc = mono_method_desc_new(functionName.c_str(), 0);
-                                        MonoMethod *method = mono_method_desc_search_in_image(methodDesc, image);
-                                        mono_method_desc_free(methodDesc);
-                                        if (method) {
-                                            void *args[3]{
-                                                    (void *) (s),
-                                                    (void *) rep,
-                                                    (void *) &req
-                                            };
-                                            MonoObject *result = mono_runtime_invoke(method, NULL, args, NULL);
-                                        } else {
-                                            std::cout << "\t\tcancel: cant open func\n";
-                                            mono_jit_cleanup(domain);
-                                            return;
-                                        }
-                                        mono_jit_cleanup(domain);
-                                    } else {
-                                        std::cout << "\t\tcancel: cant open module\n";
-                                        mono_jit_cleanup(domain);
-                                        return;
-                                    }
-                                }
-                                catch (const std::exception &exp) { mono_jit_cleanup(domain); }
-                            };
-                        }
-                        },*/
-                        {"py", [this, file, path]() {
+                        }},
+                        {"py", [this, &file, &path]() {
                             Py_Initialize();
                             try {
                                 auto error = [this]() {
@@ -793,35 +770,6 @@ public:
 
                 };
                 switch_lang[info["lang"].get<std::string>()]();
-                //dlclose(handle);
-                /*routes["/" + file.path().filename().string()] = [this](string * s, responser::response* rep, requester::request_data req, unordered_map<string, json> access_info) {
-                    char * error;
-                    cout << "\t\tpath - " << app_path + path_dirs + req.request_info.path + "/main.so" << endl;
-                    void *handle = dlopen((app_path + path_dirs + req.request_info.path + "/main.so").c_str(),RTLD_LAZY);
-                    if(!handle) {
-                        cout << "\t\tcancel: cant open module\n";
-                        return;
-                    }
-
-                    InfoFunc info = reinterpret_cast<InfoFunc>(dlsym(handle, "info"));
-                    if( (error = dlerror()) != NULL) {
-                        cout << "\t\tcancel: cant load info (" << error << ")\n";
-                        return;
-                    }
-                    cout << "\t\tinfo: " << (string)info() << endl;
-
-                    startFunc start = reinterpret_cast<startFunc>(dlsym(handle, "start"));
-                    if((error = dlerror()) != NULL) {
-                        cout << "\t\tcancel: cant load start (" << error << ")\n";
-                        return;
-                    }
-
-                    start(s, rep, req);
-                    delete error;
-                    free(error);
-                    dlclose(handle);
-
-                };*/
             }
         }
         std::cout << "------------------" << std::endl;
@@ -868,7 +816,7 @@ public:
         };*/
     }
 
-    bool is_api(std::string path)
+    bool is_api(const std::string &path)
     {
         if(routes.find(path) != routes.end())
         {
@@ -878,7 +826,7 @@ public:
             return false;
         }
     }
-    void check_api(std::string path) { // need check .so files for load modules. Use test func for this.
+    void check_api(const std::string &path) { // need check .so files for load modules. Use test func for this.
         if (!std::filesystem::exists(path)) {
             return;
         }

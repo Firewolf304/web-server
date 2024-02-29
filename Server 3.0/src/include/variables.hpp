@@ -17,14 +17,6 @@ typedef int sock_handle;
 extern firewolf::monitor::collect_connection client_map;
 //============Monitor
 extern string path;
-/*----epoll----*/
-extern int nfds;
-extern int save_nfds;
-extern int epfd;
-extern int ret;
-extern struct epoll_event ev;
-extern vector<struct epoll_event> evlist; //[NFDS];
-/*----epoll----*/
 extern sockaddr_in servAddr;           // address data
 extern sock_handle sock;               // socket handle
 extern std::shared_ptr<unsigned int> port;                 // port
@@ -54,7 +46,6 @@ public:
     string * ip{};
     std::shared_ptr<unsigned int> portptr;
     ssl_space::SSL * ssl_info{};
-    std::shared_ptr<int> active_epols;
     string * pages{};
     json config_Data;
     json access_Data;

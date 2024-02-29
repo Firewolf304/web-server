@@ -7,6 +7,7 @@
 
 
 #include "../include.hpp"
+#include "liburing/task.hpp"
 namespace firewolf::streams {
     class log_streamer {
     public:
@@ -97,7 +98,6 @@ namespace firewolf::streams {
                 }
             }));
         }
-
         void out(std::string type, std::string text) {
             auto d = std::move( std::async(std::launch::async, [this, text, type] {
                 if( !this->allowed_type[type] ) {return;}
@@ -108,6 +108,18 @@ namespace firewolf::streams {
                     this->stream << text;
                 }
             }));
+        }
+        void out_coro(std::string type, std::string text) {
+             auto d = std::move([this, text, type] -> uio::task<void> {
+                if( !this->allowed_type[type] ) { co_return;}
+                if(type != "") {
+                    this->stream << "[" + type + "] " + text;
+                }
+                else {
+                    this->stream << text;
+                }
+                 co_return;
+            });
         }
         void out(std::string text) {
             auto d = std::move(std::async(std::launch::async, [this, text] {

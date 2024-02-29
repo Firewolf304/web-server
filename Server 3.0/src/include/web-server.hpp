@@ -5,6 +5,8 @@
 #ifndef SERVER_3_0_WEB_SERVER_HPP
 #define SERVER_3_0_WEB_SERVER_HPP
 #include "../include/variables.hpp" // вызывать где надо
+#include <liburing/io_service.hpp>
+#include <utility>
 namespace firewolf::web_server {
     class web_server {
     public:
@@ -17,13 +19,15 @@ namespace firewolf::web_server {
         std::string config_file_name = "config.json";
         std::string access_file_name = "access.json";
         // ==============multiplexer==============
-        vector<struct epoll_event> evlist; //[NFDS];
-        int ret;
-        int epfd;
+        std::shared_ptr<uio::io_service> service;
+        //vector<struct epoll_event> evlist; //[NFDS];
+        //int ret;
+        //int epfd;
         // ==============basic client==============
         int timeout_socket = 3000; //milisec
         int timeout_client = -1;
         int nfds = 20000;                                                                           // multiplexer size
+        fd_set readfds;
         // ==============local==============
         sockaddr_in servAddr;                                                                       // address data
         sock_handle sock;                                                                           // socket handle
@@ -43,28 +47,26 @@ namespace firewolf::web_server {
 
         // ==============global==============
         main_funcs main_data = { std::make_shared<std::string>(path), &logging, &timeout_client, &app,
-                                 &ipAddr, port, &space,
-                                 std::make_shared<int>(nfds), &PAGE_PATH,
+                                 &ipAddr, port, &space, &PAGE_PATH,
                                  NULL, false, {}, {}, &sqller_postgres,
                                  std::make_shared<sock_handle>(sock), &client_map, //&module,
                                  std::make_shared<firewolf::requester::access_response>(content_access)
         };
-        void epoll_add(int fd, uint32_t events) {
+        /*void epoll_add(int fd, uint32_t events) {
             struct epoll_event ev;
             ev.events = events;
             ev.data.fd = fd;
             if (epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev) == -1) {
                 logging.out("ERROR", "Error epoll add");
             }
-        }
+        }*/
         web_server() {}
         ~web_server() {
-            this->close_epolls();
+            //this->close_epolls();
             space.close();
             logging.close();
         }
-        web_server(std::string config_name) : config_file_name(config_name){
-
+        web_server(std::string const & config_name) : config_file_name(std::move(config_name)){
             signal(SIGPIPE, SIG_IGN);
             this->space = firewolf::ssl_space::SSL(false, &secure_handle);
             sockettimer.tv_sec = (int)(timeout_socket / 1000);
@@ -76,13 +78,12 @@ namespace firewolf::web_server {
             //logging.allowed_type[log_type::DEBUG] = false;
             this->logging.config->format_type = "%D-%T";
             read_cfg();
-
             if (this->main_data.config_Data["SERVER"]["CONFIG"].contains("MODULES")) {
                 if (this->main_data.config_Data["SERVER"]["CONFIG"]["MODULES"]["ENABLE"].get<bool>()) {
                     this->app.init();
                 }
             }
-            this->evlist = vector<struct epoll_event>(nfds);
+            //this->evlist = vector<struct epoll_event>(nfds);
             if(this->enable_ssl) {
                 this->space.init();
             }
@@ -102,119 +103,143 @@ namespace firewolf::web_server {
                 perror("Cant bind socket");
                 exit(-1);
             }
+            FD_ZERO(&readfds);
+            FD_SET(this->sock, &readfds);
             this->logging << "Binded ip address: " + (string)((this->secure_handle) ? "https://" : "http://") + (string)inet_ntoa(this->servAddr.sin_addr) + (string)":" + to_string(ntohs(this->servAddr.sin_port));
         }
         void listenning() {
             listen(this->sock, 1000);
-            if((epfd = epoll_create1(0)) < 0 ) {
+            /*if((epfd = epoll_create1(0)) < 0 ) {
                 perror("Error create epoll");
                 exit(-4);
-            }
-            epoll_add(sock, EPOLLIN);
+            }*/
+            //epoll_add(sock, EPOLLIN);
             //ev.events = EPOLLIN;
             //ev.data.fd = sock;
             //if ( (ret = epoll_ctl(epfd, EPOLL_CTL_ADD, sock, &ev)) < 0) {
             //    perror("Error control epoll");
             //    exit(-5);
             //}
-            auto check = [this]( sockaddr_in client, ssl_st * ssl, bool secure, std::shared_ptr< epoll_event > event) -> void {
+            auto check = [this]( sockaddr_in client, ssl_st * ssl, bool secure, int clientfd) -> uio::task<void> {
+
                 requester::request_data info;
                 bool access = true;
-                bool nonblock = false;
-                auto stop = [ssl, event, secure, this]() {
+                auto stop = [ssl, clientfd, secure, this]() {
                     //client_map.clients.erase(client_handle);
                     if(secure) {
                         SSL_shutdown(ssl); SSL_free(ssl); }
-                    epoll_ctl(epfd, EPOLL_CTL_DEL, (*event).data.fd, event.get());
-                    close((*event).data.fd);
+                    //epoll_ctl(epfd, EPOLL_CTL_DEL, (*event).data.fd, event.get());
+                    close(clientfd);
                 };
-                auto check_nonblock = [&nonblock, event](){
+                int flags = MSG_PEEK;
+                auto check_nonblock = [&flags, clientfd](){
                     int bytes;
-                    int result = ioctl((*event).data.fd, FIONREAD, &bytes);
+                    int result = ioctl(clientfd, FIONREAD, &bytes);
                     if(result == -1) {
-                        nonblock = true;
+                        flags |= MSG_DONTWAIT;
                     } else {
                         if(result <= 0) {
-                            nonblock = true;
+                            flags |= MSG_DONTWAIT;
                         }
                     }
                 };
-                msghdr msg = {0};
-                char buffer[2048];
-                iovec iov[1];
-                iov[0].iov_base = buffer;
-                iov[0].iov_len = sizeof(buffer);
 
-                msg.msg_iov = iov;
-                msg.msg_iovlen = 1;
+                int const max_buffer = 2048;
+                char buffer[max_buffer];
+                memset(&buffer, 0, sizeof(buffer));
 
+
+                bool eof = false;
+                ssize_t total = 0;
                 try {
-                    ssize_t return_code = 0;
                     check_nonblock();
-                    if(nonblock) {
+                    //ssize_t return_code =  recvmsg(clientfd, &msg, flags);
+                    if(!secure) {
+                        msghdr msg = {nullptr};
+                        iovec iov[1];
+                        iov[0].iov_base = buffer;
+                        iov[0].iov_len = sizeof(buffer);
+                        msg.msg_iov = iov;
+                        msg.msg_iovlen = 1;
+                        timeval timeout{};
+                        timeout.tv_sec = 0;
+                        timeout.tv_usec = timeout_client;
+                        int tryes = 0;
+                        logging.out("DEBUG", "FROM ERRNO: " + std::to_string(errno));
+                        int maxtry = 5;
+                        while (total < max_buffer && maxtry >= 0) {
+                            ssize_t n = recvmsg(clientfd, &msg, flags);
+                            logging.out("DEBUG", "TO ERRNO: " + std::to_string(errno));
+                            if (n > 0) {
+                                total += n;
+                            } else if (n == 0) {
+                                eof = true;
+                            } else if (errno == EWOULDBLOCK || errno == EAGAIN) {
+                                tryes++;
+                                int ready = select(clientfd, &readfds, nullptr, nullptr, &timeout);
+                                if (ready < 0) {
+                                    logging.out("DEBUG", "No timeout");
+                                }
+                                maxtry--;
+                            } else {
+                                break;
+                            }
+                        }
+                    } else {
+                        total += SSL_read(ssl, buffer, sizeof(buffer) - 1);
+                    }
+                    /*if(nonblock ) {
                         logging.out("DEBUG", "NONBLOCK");
-                        return_code = (secure) ? SSL_read(ssl, buffer, sizeof(buffer) - 1) : recvmsg((*event).data.fd,
-                                                                                                     &msg, MSG_PEEK |
-                                                                                                           MSG_DONTWAIT); //recv ((*event).data.fd, &buffer, sizeof(buffer), MSG_PEEK | MSG_DONTWAIT );
+                        return_code = (secure) ? SSL_read(ssl, buffer, sizeof(buffer) - 1) : recvmsg(clientfd, &msg, MSG_PEEK | MSG_DONTWAIT);
                     }
                     else {
                         logging.out("DEBUG", "BLOCK");
-                        return_code = (secure) ? SSL_read(ssl, buffer, sizeof(buffer) - 1) : recvmsg((*event).data.fd, &msg, MSG_PEEK );
-                    }
+                        return_code = (secure) ? SSL_read(ssl, buffer, sizeof(buffer) - 1) : recvmsg(clientfd, &msg, MSG_PEEK );
+                    }*/
                     //async(launch::async, logger::log_chat_async, "CLIENT", logger::type_log::DEBUG, (string) "Connected client, status - " + ((secure) ? (string) "true" : (string) "false"), &client);
                     logging.out("LOG", "Connected client: " + (string)inet_ntoa(client.sin_addr) + ":" + to_string(ntohs(client.sin_port)) + ", status - " + ((secure) ? (string) "true" : (string) "false"));
-                    logging.out("DEBUG", "ID socket = " + to_string((*event).data.fd));
-                    if(errno == EAGAIN) {
+                    logging.out("DEBUG", "ID socket = " + to_string(clientfd));
+                    /*if(errno == EAGAIN) {
                         logging.out("WARNING", "Need again: " + to_string(errno));
-                        return_code = recvmsg((*event).data.fd, &msg, MSG_PEEK );
-                        /*
-                        while(errno == EAGAIN || errno == EWOULDBLOCK) {
-                            std::cout << errno << " " << (*event).data.fd << std::endl;
-                            return_code = recvmsg((*event).data.fd, &msg, MSG_PEEK | MSG_DONTWAIT);
-                        }*/
-                    }
+                        return_code = recvmsg(clientfd, &msg, MSG_PEEK | MSG_NOSIGNAL);
+                    }*/
                 } catch(const std::exception & e ) {
-                    stop(); return;
+                    stop(); co_return;
                 }
                 try{
 
-                    if (((string)buffer).length()<= 0) {
-                        //async(launch::async, logger::log_chat_async, "CLIENT", logger::type_log::DEBUG, "Detect no data", &client);
+                    if (eof || total <= 0) {
                         logging.out("WARNING", "Detect no data");
-                        stop(); return;
+                        stop(); co_return;
                     }
                     if (  ::requester::get_request(buffer, &info) < 0) {
                         logging.out("WARNING", "Incorrect request");
-                        stop(); return;
+                        stop(); co_return;
                     }
-                    if((string)(info.request_info.method) == "") {
-                        logging.out("WARNING", "No method code");
-                        stop(); return;
+                    if(std::string(info.request_info.method).empty()) {
+                        logging.out("WARNING", "No method co    de");
+                        stop(); co_return;
                     }
 
                     memset(&buffer, 0, sizeof(buffer));
                     //if(info.request_info.path == "/") { info.request_info.path = ""; }
-                    logging.out("LOG", (string) "Request: Method - " + (string) (info.request_info.method) +", path - " + (string) (info.request_info.path) + ", media_path - " +(string) (info.request_info.media_path) + ", body - " + (string) (info.body));
-
+                    logging.out("LOG", std::string("Request: Method - ") + info.request_info.method + ", path - " +  std::string(info.request_info.path) + ", media_path - " + std::string(info.request_info.media_path) + ", body - " + std::string(info.body));
                     //if (info.headers.contains("Content-Type"))
                     //logging.out(log_type::DEBUG,(string) "\t\t---------------\nData info: \n" +(string) "\t\tContent type: " + (string) info.headers["Content-Type"].get<string>());
                 }
-                catch(std::exception e){
+                catch(std::exception const & e){
                     /*async(launch::async, logger::log_chat_async, "CLIENT", logger::type_log::DEBUG, (string) "Error parsing! " +
                                                                                                     (string) "\n Try check page: " +
                                                                                                     info.request_info.path +
                                                                                                     "\n Headers: " +
                                                                                                     (string) info.headers, &client);*/
-                    logging.out("ERROR", (string) "Error parsing! " +
-                                         (string) "\n Try check page: " +
-                                         info.request_info.path +
-                                         "\n Headers: " +
-                                         (string) info.headers);
+                    logging.out("ERROR", std::string("Error parsing!\n Try check page: ") + info.request_info.path + "\n Headers: " +  info.headers.dump());
                     //cout << std::stacktrace::current() << endl;
                 }
                 string compressed_data;
                 try {
-                    requester::check_path data(path + PAGE_PATH + info.request_info.path);
+                    std::string path_save = path + PAGE_PATH + info.request_info.path;
+                    requester::check_path data(path_save);
                     //async(launch::async, logger::log_chat_async, "CLIENT", logger::type_log::LOG,"Trying check by path: " + (string) (data.is_dir() ? data.path + "/main.html" : data.path), &client);
                     //logging.out("DEBUG", "Trying check by path: " + (string) (data.is_dir() ? data.path + "/main.html" : data.path));
                     responser::response rep(secure);
@@ -234,25 +259,25 @@ namespace firewolf::web_server {
                             break;
                         case requester::CLOSE_CLIENT:
                             stop();
+                            co_return;
                             break;
                         case requester::ALLOWED:
                             break;
                     }
                     if(main_data.machine_info) {
-                        struct utsname unameData;
+                        utsname unameData;
                         uname(&unameData);
                         rep.header_body += "Architecture: " + (string) (unameData.machine) + "\r\n"
-                                                                                             "System: " + (string) (unameData.sysname) + "\r\n"
-                                                                                                                                         "Version: " + (string) (unameData.version) + "\r\n"
-                                                                                                                                                                                      "Release: " + (string) (unameData.release) + "\r\n"
-                                                                                                                                                                                                                                   "Name: nginx\r\n";
+                                           "System: " + (string) (unameData.sysname) + "\r\n"
+                                           "Version: " + (string) (unameData.version) + "\r\n"
+                                           "Release: " + (string) (unameData.release) + "\r\n"
+                                           "Name: nginx\r\n";
                     }
                     if(access) {
                         if(app.is_api(info.request_info.path)){
                             try {
-                                //logging.out(log_type::DEBUG, "This is an api");
                                 app.routes[info.request_info.path](&compressed_data, static_cast<responser::response *>(&rep), info, app.access, static_cast< void* >(&main_data) );
-                            } catch(const std::exception err){}
+                            } catch(const std::exception & err){}
                         }
                         else {
                             // compress
@@ -279,31 +304,40 @@ namespace firewolf::web_server {
                     rep.body_text += compressed_data;
                     //std::cout << rep.make_request() << std::endl;
                     rep.body_text = rep.make_request();
-                    iov[0].iov_base = const_cast<char*>(rep.body_text.c_str());
-                    iov[0].iov_len = rep.body_text.size();
-                    memset(&msg,0,sizeof(msg) );
-                    msg.msg_iov = iov;
-                    msg.msg_iovlen = 1;
-                    (secure) ? SSL_write(ssl,rep.make_request().c_str(), rep.make_request().length()) : sendmsg((*event).data.fd, &msg, MSG_NOSIGNAL); //send((*event).data.fd, rep.make_request().c_str(), rep.make_request().length(), MSG_NOSIGNAL);
+                    if(!secure) {
+                        msghdr msg = {nullptr};
+                        iovec iov[1];
+                        iov[0].iov_base = const_cast<char*>(rep.body_text.c_str());
+                        iov[0].iov_len = rep.body_text.size();
+                        memset(&msg,0,sizeof(msg) );
+                        msg.msg_iov = iov;
+                        msg.msg_iovlen = 1;
+                        sendmsg(clientfd, &msg, MSG_NOSIGNAL );
+                    } else {
+                        SSL_write(ssl,rep.make_request().c_str(), rep.make_request().length());;
+                    }
+
+                    //(secure) ? SSL_write(ssl,rep.make_request().c_str(), rep.make_request().length()) : sendmsg(clientfd, &msg, MSG_NOSIGNAL ); //send((*event).data.fd, rep.make_request().c_str(), rep.make_request().length(), MSG_NOSIGNAL);
                 } catch (const std::exception& ex) {
                     //async(launch::async, logger::log_chat_async, "CLIENT", logger::type_log::ERROR,"Error: " + (string) ex.what() + "\n Try check page: " + info.request_info.path, &client);
                     logging.out("ERROR", "Error: " + (string) ex.what() + "\n Try check page: " + info.request_info.path);
                     compressed_data = "Error response";
                 }
                 stop();
-                return;
+                co_return;
             };
-            auto accept_for = [this, check](std::shared_ptr< epoll_event > event) -> void  {
-                setsockopt((*event).data.fd, SOL_SOCKET, SO_RCVTIMEO, static_cast<timeval *>(&sockettimer), sizeof(timeval));
-                client_map.async_input((*event).data.fd);
+            auto accept_for = [this, check](int clientfd) -> uio::task<void> {
+                uio::on_scope_exit closefd([&]() { service->close(clientfd); });
+                setsockopt(clientfd, SOL_SOCKET, SO_RCVTIMEO, static_cast<timeval *>(&sockettimer), sizeof(timeval));
+                client_map.async_input(clientfd);
                 sockaddr_in client;
                 socklen_t len = sizeof(client);
-                getsockname((*event).data.fd, (sockaddr *)&client, &len);
+                getsockname(clientfd, (sockaddr *)&client, &len);
                 int secure = secure_handle; // add algorithm multi i/o
                 SSL * ssl = NULL;
                 if(secure_handle) {
                     ssl = SSL_new(space());
-                    if (SSL_set_fd(ssl, (*event).data.fd) <= 0) {
+                    if (SSL_set_fd(ssl, clientfd) <= 0) {
                         secure = 0;
                         SSL_shutdown(ssl); SSL_free(ssl); //close(client_handle);
                         //continue;
@@ -316,9 +350,27 @@ namespace firewolf::web_server {
 
                 }
                 //void (*check)( sockaddr_in, ssl_st *, bool, std::shared_ptr< epoll_event > );
-                std::async(std::launch::async, check, client, ssl, secure, event);//check(client, client_handle);
+                //std::async(std::launch::async, check, client, ssl, secure, clientfd);//check(client, client_handle);
+                co_await check(client, ssl, secure, clientfd);
+                co_return;
             };
-            while(true)
+            this->service = std::make_shared<uio::io_service>(10000);
+            service->run([](std::shared_ptr<uio::io_service> & service, int & socket, auto & accept_for) noexcept -> uio::task<void> {
+                             while (true) {
+                                 int clientfd = 0;
+                                 while ((clientfd = co_await service->accept(socket, nullptr, nullptr)) <= 0);
+                                 if(clientfd > socket) {
+                                     auto func_async = [&](int client) -> uio::task<void> {
+                                         fcntl(client, F_SETFL, fcntl(client, F_GETFL) | O_NONBLOCK);
+                                         co_await accept_for(clientfd);
+                                     }(clientfd);
+                                 }
+                                 co_await service->shutdown(clientfd, SHUT_RDWR);
+                                 co_await service->close(clientfd);
+                             }
+                         }(this->service, this->sock, accept_for)
+            );
+            /*while(true)
             {
                 if(( this->nfds = epoll_wait(this->epfd, this->evlist.data(), this->save_nfds, this->timeout_client) ) < 0) continue;
                 int i = 0;
@@ -343,14 +395,14 @@ namespace firewolf::web_server {
                     i++;
                 }
                 usleep(10);
-            }
+            }*/
         }
-        void close_epolls() {
+        /*void close_epolls() {
             for (int i = 0; i < save_nfds; i++)
             {
                 close(this->evlist[i].data.fd);
             }
-        }
+        }*/
         std::string open_file( std::ifstream & file ) {
             std::string line, text;
             if (file.is_open()) {
@@ -378,7 +430,7 @@ namespace firewolf::web_server {
             //cout << "LINE PARSE " + text_cfg;
             nlohmann::json config = nlohmann::json::parse(text_cfg);
             if(config["SERVER"].contains("CONFIG")) {
-                *(this->main_data.active_epols) = config["SERVER"]["CONFIG"]["EPOLLS_COUNT"].get<int>();
+                //*(this->main_data.active_epols) = config["SERVER"]["CONFIG"]["EPOLLS_COUNT"].get<int>();
                 *(this->main_data.ip) = config["SERVER"]["CONFIG"]["IP"].get<string>();
                 *(this->main_data.portptr) =
                         config["SERVER"]["CONFIG"]["PORT"].get<uint>();

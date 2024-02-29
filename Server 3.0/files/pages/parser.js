@@ -1,5 +1,6 @@
-const jsonOutput = document.getElementById('box');
+
 function createList(obj) {
+
     const list = document.createElement('ul');
     list.className = 'json-list';
     for (const key in obj) {
@@ -46,9 +47,10 @@ function toggleVisibility(element) {
     element.classList.toggle('hidden');
 }
 
-const xhttp = new XMLHttpRequest();
-xhttp.onreadystatechange = function () {
+const xhttp_api = new XMLHttpRequest();
+xhttp_api.onreadystatechange = function () {
     if (this.readyState == 4 && this.status == 200) {
+        const jsonOutput = document.getElementById('api');
         console.log(this.responseText);
         var data = JSON.parse(this.responseText);
         const initialList = createList(data);
@@ -59,6 +61,22 @@ xhttp.onreadystatechange = function () {
     }
 };
 let randomParam = Math.floor(Math.random() * 10000);
-xhttp.open("GET", "/apis/tools?random=" + randomParam, true);
-xhttp.send();
+xhttp_api.open("GET", "/apis/tools?random=" + randomParam, true);
+xhttp_api.send();
+const xhttp_pages = new XMLHttpRequest();
+xhttp_pages.onreadystatechange = function () {
+    if (this.readyState == 4 && this.status == 200) {
+        const jsonOutput = document.getElementById('pages');
+        console.log(this.responseText);
+        var data = JSON.parse(this.responseText);
+        const initialList = createList(data);
+        jsonOutput.appendChild(initialList);
+    }
+    else {
+        console.log(this.responseText);
+    }
+};
 
+randomParam = Math.floor(Math.random() * 10000);
+xhttp_pages.open("GET", "/apis/getpages?random=" + randomParam, true);
+xhttp_pages.send();

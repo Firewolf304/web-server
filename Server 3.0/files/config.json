@@ -7,7 +7,6 @@
       "WAIT" : 10,
       "PATH_PAGES": "/pages",
       "MACHINE_INFO" : false,
-      "EPOLLS_COUNT" : 20000,
       "MODULES" : {
         "PATH" : "/apis",
         "ENABLE" : true,
@@ -15,7 +14,7 @@
       },
       "MODS" : {
         "PATH" : "/modules",
-        "ENABLE" : true
+        "ENABLE" : false
       }
     },
     "SSL" : {

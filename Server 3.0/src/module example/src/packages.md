@@ -3,7 +3,7 @@
 <b align="center">Fedora</b>
     
     cd ~
-    dnf install boost-devel boost-iostrams cmake g++ gcc git json-devel libcurl-devel libpqxx-devel libpq libpq-devel openssl-devel python3-devel
+    dnf install boost-devel boost-iostrams cmake g++ gcc git json-devel libcurl-devel libpqxx-devel mono-devel openssl-devel
     git clone https://github.com/Firewolf304/web-server.git
     cd web-server/Server\ 2.0/src/
     cmake .
