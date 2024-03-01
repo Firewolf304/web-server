@@ -40,7 +40,7 @@ namespace firewolf::streams {
         char timer[100];
         strftime(timer, 100, logger->config.format_type.c_str(), localtime(&time));
         logger->mtx.lock();
-        logger->stream_cout << ((logger->config.show_time) ? ("[" + (std::string)timer + "] ") : "") + text;
+        logger->stream_cout << ((logger->config.show_time) ? ("[" + std::string(timer) + "] ") : "") + text;
         //std::this_thread::sleep_for(this->config.wait);
         usleep(logger->config.wait);
         logger->mtx.unlock();

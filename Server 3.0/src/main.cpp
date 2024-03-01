@@ -4,6 +4,7 @@
 #include "include/web-server.hpp"
 #include <cctype>
 #include <filesystem>
+#include <ctime>
 
 int main() {
     firewolf::web_server::web_server server("config.json");
@@ -63,7 +64,6 @@ int main() {
         }
         rep->body_text += "</pre></html>";
     };
-
     server.app.routes["/apis/getpages"] = [&server](std::string *s, responser::response *rep, requester::request_data req, std::unordered_map<std::string, json> access_info, void *f) -> void {
         rep->header_body += "Content-Type: application/json; charset=utf-8\r\nAccess-Control-Allow-Origin: *\r\n";
         std::function<json(const std::string&, const std::string&)> recursive = [&recursive](const std::string& path, const std::string& localPath) -> json {
@@ -86,6 +86,25 @@ int main() {
         rep->body_text += result.dump();
     };
 
+    server.app.routes["/apis/input"] = [&server](std::string *s, responser::response *rep, requester::request_data req, std::unordered_map<std::string, json> access_info, void *f) -> void {
+        try {
+            std::ofstream out(server.path + server.PAGE_PATH + "/lab1/file/filetxt", std::ios_base::app);
+            if(out.is_open()) {
+                json file = json::parse(req.body);
+                auto time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+                char timer[100];
+                strftime(timer, 100, "%a %b %d %T %Y", localtime(&time));
+                out << std::string(timer) << " Name: '" << file["name"] << "` Comment: " << file["comment"] << std::endl;
+                out.close();
+                rep->code_status = 201;
+            } else {
+                rep->code_status = 423;
+            }
+        }
+        catch(const std::runtime_error & e) {}
+        catch(const std::out_of_range & e) {}
+        catch(const std::exception & e) {}
+    };
     server.listenning();
     return 0;
 }

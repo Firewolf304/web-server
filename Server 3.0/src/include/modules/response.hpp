@@ -255,6 +255,7 @@ namespace firewolf::requester{
         //cout << "end" << endl;
         return js;
     }
+    //inline int get_request(char * buffer, request_data * data) {
     inline int get_request(char * buffer, request_data * data) {
         try {
             std::vector<std::string> body = save_split(buffer, '\n');

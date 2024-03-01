@@ -125,25 +125,18 @@ namespace firewolf::web_server {
                 requester::request_data info;
                 bool access = true;
                 auto stop = [ssl, clientfd, secure, this]() {
-                    //client_map.clients.erase(client_handle);
                     if(secure) {
                         SSL_shutdown(ssl); SSL_free(ssl); }
-                    //epoll_ctl(epfd, EPOLL_CTL_DEL, (*event).data.fd, event.get());
                     close(clientfd);
                 };
                 int flags = MSG_PEEK;
                 auto check_nonblock = [&flags, clientfd](){
                     int bytes;
                     int result = ioctl(clientfd, FIONREAD, &bytes);
-                    if(result == -1) {
+                    if(result <= 0) {
                         flags |= MSG_DONTWAIT;
-                    } else {
-                        if(result <= 0) {
-                            flags |= MSG_DONTWAIT;
-                        }
                     }
                 };
-
                 int const max_buffer = 2048;
                 char buffer[max_buffer];
                 memset(&buffer, 0, sizeof(buffer));
@@ -165,15 +158,15 @@ namespace firewolf::web_server {
                         timeout.tv_sec = 0;
                         timeout.tv_usec = timeout_client;
                         int tryes = 0;
-                        logging.out("DEBUG", "FROM ERRNO: " + std::to_string(errno));
+                        //logging.out("DEBUG", "FROM ERRNO: " + std::to_string(errno));
                         int maxtry = 5;
                         while (total < max_buffer && maxtry >= 0) {
                             ssize_t n = recvmsg(clientfd, &msg, flags);
-                            logging.out("DEBUG", "TO ERRNO: " + std::to_string(errno));
                             if (n > 0) {
                                 total += n;
                             } else if (n == 0) {
                                 eof = true;
+                                break;
                             } else if (errno == EWOULDBLOCK || errno == EAGAIN) {
                                 tryes++;
                                 int ready = select(clientfd, &readfds, nullptr, nullptr, &timeout);
@@ -217,13 +210,13 @@ namespace firewolf::web_server {
                         stop(); co_return;
                     }
                     if(std::string(info.request_info.method).empty()) {
-                        logging.out("WARNING", "No method co    de");
+                        logging.out("WARNING", "No method code");
                         stop(); co_return;
                     }
 
                     memset(&buffer, 0, sizeof(buffer));
                     //if(info.request_info.path == "/") { info.request_info.path = ""; }
-                    logging.out("LOG", std::string("Request: Method - ") + info.request_info.method + ", path - " +  std::string(info.request_info.path) + ", media_path - " + std::string(info.request_info.media_path) + ", body - " + std::string(info.body));
+                    logging.out("LOG", std::string("Request: Method - ") + info.request_info.method + ", path - " +  std::string(info.request_info.path) + ", media_path - " + std::string(info.request_info.media_path));
                     //if (info.headers.contains("Content-Type"))
                     //logging.out(log_type::DEBUG,(string) "\t\t---------------\nData info: \n" +(string) "\t\tContent type: " + (string) info.headers["Content-Type"].get<string>());
                 }
@@ -312,7 +305,30 @@ namespace firewolf::web_server {
                         memset(&msg,0,sizeof(msg) );
                         msg.msg_iov = iov;
                         msg.msg_iovlen = 1;
-                        sendmsg(clientfd, &msg, MSG_NOSIGNAL );
+                        //sendmsg(clientfd, &msg, MSG_NOSIGNAL | MSG_DONTWAIT );
+                        int maxtries = 10;
+                        total = 0;
+                        while(maxtries >= 0 && total < rep.body_text.size()) {
+                            ssize_t n = sendmsg(clientfd, &msg, MSG_NOSIGNAL | MSG_DONTWAIT);
+                            if(n > 0) {
+                                if(n < rep.body_text.size()) {
+                                    total += n;
+                                } else {
+                                    break;
+                                }
+                            }
+                            if(n == 0) {
+                                logging.out("ERROR", "Send return zero buffer");
+                                break;
+                            }
+                            if(errno == EAGAIN || errno == EINTR) {
+                                logging.out("WARNING", "Send not ready");
+                                maxtries -= 1;
+                            } else {
+                                logging.out("ERROR", "Send error: " + std::to_string(errno));
+                                break;
+                            }
+                        }
                     } else {
                         SSL_write(ssl,rep.make_request().c_str(), rep.make_request().length());;
                     }
