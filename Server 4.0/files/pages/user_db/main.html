@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Title</title>
+  <link rel="stylesheet" type="text/css" href="main.css">
+
+</head>
+<body>
+<div class="container">
+  <div class="left">
+    <div id="block"> User table
+      <table class="table" id="user_table">
+        <tr>
+          <td>User id</td>
+          <td>Role</td>
+          <td>Level</td>
+          <td>Login</td>
+          <td>Password</td>
+          <td>update</td>
+          <td>delete</td>
+        </tr>
+        <tr>
+          <td> <a href="#" onclick='(function() {
+              fetch("user_db.php?method=delete_user&user_id=", {
+                method: "POST",
+                headers: {
+                "Content-Type": "text/plain"
+                },
+                body: JSON.stringify(send)
+              }).then(response => { location.reload(); });
+
+            })'>update</a> </td>
+          <td><input type="text" name="your_input_name" value="Default Value"></td>
+          <td><button>123awdawdaw</button></td>
+        </tr>
+      </table>
+    </div>
+  </div>
+  <div class="right">
+    <div id="block"> Session table
+      <table class="table" id="session_table">
+        <tr>
+          <td>User id</td>
+          <td>Role</td>
+          <td>Level</td>
+          <td>Login</td>
+          <td>Password</td>
+          <td>update</td>
+          <td>delete</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+
+</body>
+<script src="script.js"></script>
+</html>

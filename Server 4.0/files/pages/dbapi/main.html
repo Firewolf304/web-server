@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Request Form</title>
+</head>
+<style>
+    #status {
+        position: absolute;
+        top: 20px; right: 90px;
+        display: flex;
+    }
+    </style>
+<body>
+
+<h2>API Request Form</h2>
+
+<input type="text" id="addData" placeholder="Введите данные для добавления"><br>
+<button onclick="addToDb()">Добавить</button><br><br>
+
+<input type="text" id="searchData" placeholder="Введите данные для поиска"><br>
+<button onclick="searchInDb()">Искать</button><br><br>
+
+<button onclick="clearFunc()">Очистить</button><br><br>
+
+<div id="status">Status: null</div>
+<div id="result"></div>
+
+<script>
+    function addToDb() {
+        const data = document.getElementById('addData').value;
+        sendRequest(data, 'add');
+    }
+
+    function searchInDb() {
+        const data = document.getElementById('searchData').value;
+        sendRequest(data, 'search');
+    }
+    function clearFunc() {
+        document.getElementById('result').innerText = "";
+    }
+
+    function sendRequest(data, method) {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/apis/db_change', true);
+
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState === 4) {
+                if (xhr.status === 200) {
+                    document.getElementById('status').innerText = "Status: " + xhr.getResponseHeader("status");
+                    //<pre id="result">
+                    let first = xhr.responseText.indexOf('<pre id="result">');
+                    document.getElementById('result').innerText = xhr.responseText.substring(
+                        first + '<pre id="result">'.length,
+                        xhr.responseText.indexOf("</pre>" , first)
+                    );
+                    //document.getElementById('result').innerText = xhr.responseText;
+                } else {
+                    document.getElementById('status').innerText = "Status: error";
+                }
+            }
+        };
+
+        xhr.setRequestHeader('Content-Type', '*/*');
+        xhr.setRequestHeader('method', method);
+        xhr.send( data );
+    }
+</script>
+
+</body>
+</html>

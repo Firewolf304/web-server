@@ -1,0 +1,9 @@
+{
+  "SERVER" : {
+    "ADDRESS" : "127.0.0.1",
+    "PORT" : 83,
+    "ENABLE_MODULES" : true,
+    "PAGES_FOLDER" : "/pages",
+    "LOG_LEVEL": 3
+  }
+}

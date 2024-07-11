@@ -1,0 +1,14 @@
+{
+  "root" : [
+    {"value" : 1000, "access" : [ "/^(?!\\/login\\/main\.html).*\\/.*$/"  ] }
+  ],
+  "test" : [
+    {"value" : 10, "access" : [ "^\\/.*"  ] }
+  ],
+  "moderator" : [
+    {"value" : 1, "access" : [ "^\\/.*"  ] }
+  ],
+  "user": [
+    {"value" : 0, "access" : [ "^\\/.*"  ] }
+  ]
+}

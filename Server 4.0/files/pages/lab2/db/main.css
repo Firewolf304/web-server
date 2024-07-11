@@ -1,0 +1,37 @@
+#block {
+    transform: translate(10%, 10%);
+}
+table {
+    left: 300px;
+    border-collapse: collapse;
+    width: 80%;
+    table-layout: fixed;
+}
+table, th, td {
+    border: 2px solid #000;
+}
+th, td {
+    padding: 1px;
+    text-align: left;
+    word-wrap: break-word;
+}
+td:nth-child(1) { width: 20%; }
+td:nth-child(2) { width: 12%; }
+td:nth-child(3) { width: 10%; }
+td:nth-child(4) { width: 6%; }
+th {
+    background-color: #f2f2f2;
+}
+.container {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+}
+.box {
+    width: 400px; /* Ширина вашего блока */
+    height: 100px;
+    border: 2px solid #000;
+    box-sizing: border-box;
+    padding: 10px;
+    margin: 10px;
+}

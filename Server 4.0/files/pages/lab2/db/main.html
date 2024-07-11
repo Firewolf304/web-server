@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <link rel="stylesheet" type="text/css" href="main.css">
+    <script src="db.js"></script>
+</head>
+<body>
+<div class="container">
+    <div class="left">
+        <button onclick="get()">all</button>
+        <button onclick="get_string('dump', () => {get();})">dump</button>
+        <button onclick="hide('add', () => {
+            get_string('get_models', (value) => {
+                if(value != null) {
+                    console.log(value);
+                    value = value.split('\n');
+                    value.pop();
+                    var inputer = document.getElementById('add_model_selector');
+                    for(var line in value) {
+                        if(value[line] != '') {
+                            inputer.innerHTML += '<option value=' + line + '>' + value[line] + '</option>';
+                        }
+                    }
+                    document.getElementById('add_db').addEventListener('submit', function (event) {
+                        event.preventDefault();
+                        get_string('insert', () => {}, {'model_id': document.getElementById('add_model_selector').value, 'price': document.getElementById('add_model_price').value});
+                        get();
+                    });
+                } else {
+                    console.error('no values');
+                }
+            });
+        }, () => {
+            document.getElementById('add_model_selector').innerHTML = '';
+        })">add</button>
+        <div id="add" style="display: none;">
+            <form class="box" id="add_db">
+                <label for="add_model_selector">Select model: </label>
+                <select id="add_model_selector"></select> <br>
+                <label for="add_model_price">Price: </label>
+                <input id="add_model_price" required><br>
+                <button type="submit">submit</button>
+            </form>
+        </div>
+        <button onclick="hide('search', () => {
+            get_string('get_brands', (value) => {
+                if(value != null) {
+                    console.log(value);
+                    value = value.split('\n');
+                    value.pop();
+                    var inputer = document.getElementById('search_brand_selector');
+                    for(var line in value) {
+                        if(value[line] != '') {
+                            var liner = value[line].split('|');
+                            inputer.innerHTML += '<option value=' + liner[0] + '>' + liner[1] + '</option>';
+                        }
+                    }
+                } else {
+                    console.error('no values');
+                }
+            });
+            get_string('get_types', (value) => {
+                if(value != null) {
+                    console.log(value);
+                    value = value.split('\n');
+                    value.pop();
+                    var inputer = document.getElementById('search_type_selector');
+                    for(var line in value) {
+                        if(value[line] != '') {
+                            var liner = value[line].split('|');
+                            inputer.innerHTML += '<option value=' + liner[0] + '>' + liner[1] + '</option>';
+                        }
+                    }
+                } else {
+                    console.error('no values');
+                }
+            });
+            document.getElementById('search_db').addEventListener('submit', function (event) {
+                        event.preventDefault();
+                        get_string('search', (value) => {
+                            console.log('Search result:\n' + value);
+                            document.getElementById('table').innerHTML = value;
+                            }, {
+                        'brand': document.getElementById('search_brand_selector').value,
+                        'type': document.getElementById('search_type_selector').value,
+                        'model': document.getElementById('search_model_name').value
+                        });
+            });
+        }, () => {
+            document.getElementById('search_brand_selector').innerHTML = '';
+            document.getElementById('search_type_selector').innerHTML = '';
+        })">search</button>
+        <div id="search" style="display: none;">
+            <form class="box" id="search_db">
+                <label for="search_brand_selector">Brand: </label>
+                <select id="search_brand_selector"></select> <br>
+                <label for="search_type_selector">Brand: </label>
+                <select id="search_type_selector"></select> <br>
+                <label for="search_model_name">Model: </label>
+                <input id="search_model_name"><br>
+                <button type="submit">search</button>
+            </form>
+        </div>
+
+    </div>
+    <div class="right">
+        <div id="block"> data table
+            <table id="table">
+                <tr>
+                    <td>Модель</td>
+                    <td>Бренд</td>
+                    <td>Тип</td>
+                    <td>Цена</td>
+                </tr>
+                <form id="line">
+                    <tr>
+                        <td><select></select></td>
+                        <td><input value="123"></input></td>
+                        <td>Тип</td>
+                        <td>Цена</td>
+                    </tr>
+                </form>
+            </table>
+        </div>
+    </div>
+</div>
+
+
+</body>
+</html>
